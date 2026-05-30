@@ -1,9 +1,10 @@
 /** PuppetPals Socket Event Handler
- * Manages all socket.io events for player join, disconnect, and broadcasts
+ * Manages all socket.io events for player join, disconnect, animations, and broadcasts
  */
 
 import SocketEvents from '../shared/protocols.js';
 import AssetManager from './asset-manager.js';
+import AnimationSync from './animation-sync.js';
 
 class SocketHandler {
   /**
@@ -15,6 +16,7 @@ class SocketHandler {
     this.io = io;
     this.authManager = authManager;
     this.assetManager = assetManager || new AssetManager();
+    this.animationSync = new AnimationSync();
   }
 
   /**
@@ -45,6 +47,23 @@ class SocketHandler {
 
       socket.on(SocketEvents.DELETE_ASSET, (data) => {
         this.handleDeleteAsset(socket, data);
+      });
+
+      // ---- Animation Events ----
+      socket.on(SocketEvents.START_ANIMATION, (data) => {
+        this.handleStartAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.STOP_ANIMATION, (data) => {
+        this.handleStopAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_START_ANIMATION, (data) => {
+        this.handleAdminStartAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_STOP_ANIMATION, (data) => {
+        this.handleAdminStopAnimation(socket, data);
       });
     });
   }
@@ -102,19 +121,27 @@ class SocketHandler {
     console.log(`[SocketHandler] Client disconnected: ${socket.id} (${reason})`);
 
     const player = this.authManager.getPlayerInfo(socket.id);
-    if (!player) return;
+
+    // Clean up animations for this player's puppet
+    // We track puppet IDs by session ID; stop all for this session
+    if (player) {
+      const puppetId = `puppet-${player.sessionId}`;
+      this.animationSync.onPuppetDisconnected(puppetId);
+    }
 
     // Remove player from auth manager
     this.authManager.removePlayer(socket.id);
 
     // Broadcast disconnection to all remaining clients
     this.io.emit(SocketEvents.PLAYER_DISCONNECTED, {
-      sessionId: player.sessionId,
-      nickname: player.nickname,
+      sessionId: player?.sessionId,
+      nickname: player?.nickname,
       players: this.authManager.getPlayers(),
     });
 
-    console.log(`[SocketHandler] ${player.nickname} removed from session`);
+    if (player) {
+      console.log(`[SocketHandler] ${player.nickname} removed from session`);
+    }
   }
 
   /**
@@ -127,6 +154,176 @@ class SocketHandler {
     if (!player) return { authenticated: false, player: null };
     return { authenticated: true, player };
   }
+
+  // ============================================================
+  // Animation Handlers
+  // ============================================================
+
+  /**
+   * Handle start-animation request from authenticated user
+   * @param {import('socket.io').Socket} socket
+   * @param {{ puppetId: string, animation: Object }} data
+   */
+  handleStartAnimation(socket, data) {
+    const { puppetId, animation } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to control animations.',
+      });
+      return;
+    }
+
+    if (!puppetId || !animation) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'puppetId and animation are required.',
+      });
+      return;
+    }
+
+    // Start animation on server
+    this.animationSync.startAnimation(puppetId, player.sessionId, animation, true);
+
+    // Broadcast to all clients
+    this.io.emit(SocketEvents.ANIMATION_STARTED, {
+      puppetId,
+      animation,
+      serverTime: Date.now(),
+      currentTime: 0,
+    });
+
+    console.log(`[SocketHandler] ${player.nickname} started animation ${animation.id} on ${puppetId}`);
+  }
+
+  /**
+   * Handle stop-animation request from authenticated user
+   * @param {import('socket.io').Socket} socket
+   * @param {{ puppetId: string }} data
+   */
+  handleStopAnimation(socket, data) {
+    const { puppetId } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to control animations.',
+      });
+      return;
+    }
+
+    if (!puppetId) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'puppetId is required.',
+      });
+      return;
+    }
+
+    // Stop animation on server
+    this.animationSync.stopAnimation(puppetId);
+
+    // Broadcast to all clients
+    this.io.emit(SocketEvents.ANIMATION_STOPPED, {
+      puppetId,
+    });
+
+    console.log(`[SocketHandler] ${player.nickname} stopped animation on ${puppetId}`);
+  }
+
+  /**
+   * Handle admin-start-animation (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ puppetId: string, animation: Object }} data
+   */
+  handleAdminStartAnimation(socket, data) {
+    const { puppetId, animation } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to use admin controls.',
+      });
+      return;
+    }
+
+    // Check owner role
+    if (!this.authManager.isOwner(player.sessionId)) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'Only the server owner can force animations on other puppets.',
+      });
+      return;
+    }
+
+    if (!puppetId || !animation) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'puppetId and animation are required.',
+      });
+      return;
+    }
+
+    // Start animation on server (admin override)
+    this.animationSync.startAnimation(puppetId, player.sessionId, animation, false);
+
+    // Broadcast to all clients
+    this.io.emit(SocketEvents.ANIMATION_STARTED, {
+      puppetId,
+      animation,
+      serverTime: Date.now(),
+      currentTime: 0,
+    });
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} forced animation ${animation.id} on ${puppetId}`);
+  }
+
+  /**
+   * Handle admin-stop-animation (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ puppetId: string }} data
+   */
+  handleAdminStopAnimation(socket, data) {
+    const { puppetId } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to use admin controls.',
+      });
+      return;
+    }
+
+    // Check owner role
+    if (!this.authManager.isOwner(player.sessionId)) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'Only the server owner can force stop animations.',
+      });
+      return;
+    }
+
+    if (!puppetId) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'puppetId is required.',
+      });
+      return;
+    }
+
+    // Stop animation on server
+    this.animationSync.stopAnimation(puppetId);
+
+    // Broadcast to all clients
+    this.io.emit(SocketEvents.ANIMATION_STOPPED, {
+      puppetId,
+    });
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} forced stop animation on ${puppetId}`);
+  }
+
+  // ============================================================
+  // Asset Handlers (existing)
+  // ============================================================
 
   /**
    * Handle asset upload request

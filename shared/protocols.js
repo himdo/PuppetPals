@@ -43,6 +43,12 @@ const SocketEvents = {
   /** Server owner forces animation stop */
   ADMIN_STOP_ANIMATION: 'admin-stop-animation',
 
+  /** Animation error response */
+  ANIMATION_ERROR: 'animation-error',
+
+  /** Server broadcasts animation stopped */
+  ANIMATION_STOPPED: 'animation-stopped',
+
   // ---- State Sync ----
   /** Full state sync on connect */
   STATE_SYNC: 'state-sync',

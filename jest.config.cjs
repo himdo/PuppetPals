@@ -9,6 +9,7 @@ module.exports = {
     'server/**/*.js',
     'shared/**/*.js',
     'client/js/three/**/*.js',
+    'client/js/puppet/**/*.js',
     '!server/index.js', // Exclude auto-starting server from coverage
   ],
   moduleNameMapper: {

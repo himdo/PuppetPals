@@ -43,6 +43,7 @@ class MockObject3D {
     this.children = [];
     this.position = new MockVector3();
     this.rotation = new MockEuler();
+    this.scale = new MockVector3(1, 1, 1);
     this.visible = true;
     this.name = '';
   }

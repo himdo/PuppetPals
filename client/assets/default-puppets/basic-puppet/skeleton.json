@@ -1,0 +1,75 @@
+{
+  "name": "Basic Puppet",
+  "bones": [
+    {
+      "id": "torso",
+      "name": "Torso",
+      "asset": "torso.png",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "parentId": null
+    },
+    {
+      "id": "head",
+      "name": "Head",
+      "asset": "head.png",
+      "position": { "x": 0, "y": 1.2, "z": 0 },
+      "parentId": "torso"
+    },
+    {
+      "id": "upper-arm-l",
+      "name": "Upper Arm Left",
+      "asset": "upper-arm-l.png",
+      "position": { "x": -0.6, "y": 0.8, "z": 0 },
+      "parentId": "torso"
+    },
+    {
+      "id": "lower-arm-l",
+      "name": "Lower Arm Left",
+      "asset": "lower-arm-l.png",
+      "position": { "x": 0, "y": -0.5, "z": 0 },
+      "parentId": "upper-arm-l"
+    },
+    {
+      "id": "upper-arm-r",
+      "name": "Upper Arm Right",
+      "asset": "upper-arm-r.png",
+      "position": { "x": 0.6, "y": 0.8, "z": 0 },
+      "parentId": "torso"
+    },
+    {
+      "id": "lower-arm-r",
+      "name": "Lower Arm Right",
+      "asset": "lower-arm-r.png",
+      "position": { "x": 0, "y": -0.5, "z": 0 },
+      "parentId": "upper-arm-r"
+    },
+    {
+      "id": "upper-leg-l",
+      "name": "Upper Leg Left",
+      "asset": "upper-leg-l.png",
+      "position": { "x": -0.3, "y": -0.6, "z": 0 },
+      "parentId": "torso"
+    },
+    {
+      "id": "lower-leg-l",
+      "name": "Lower Leg Left",
+      "asset": "lower-leg-l.png",
+      "position": { "x": 0, "y": -0.6, "z": 0 },
+      "parentId": "upper-leg-l"
+    },
+    {
+      "id": "upper-leg-r",
+      "name": "Upper Leg Right",
+      "asset": "upper-leg-r.png",
+      "position": { "x": 0.3, "y": -0.6, "z": 0 },
+      "parentId": "torso"
+    },
+    {
+      "id": "lower-leg-r",
+      "name": "Lower Leg Right",
+      "asset": "lower-leg-r.png",
+      "position": { "x": 0, "y": -0.6, "z": 0 },
+      "parentId": "upper-leg-r"
+    }
+  ]
+}

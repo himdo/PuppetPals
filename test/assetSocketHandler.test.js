@@ -159,9 +159,11 @@ describe('SocketHandler Asset Events', () => {
         category: 'backgrounds',
       });
 
-      const resultEmitted = mockSocket.getEmitted(SocketEvents.ASSET_UPLOADED);
-      expect(resultEmitted).toBeTruthy();
-      expect(resultEmitted.success).toBe(true);
+      // Server broadcasts via io.emit, so check broadcast logs
+      const logs = io.getBroadcastLogs();
+      const broadcast = logs.find(l => l.event === SocketEvents.ASSET_UPLOADED);
+      expect(broadcast).toBeTruthy();
+      expect(broadcast.data.success).toBe(true);
     });
 
     it('should broadcast asset-uploaded to all clients', () => {

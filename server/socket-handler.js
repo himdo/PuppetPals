@@ -184,18 +184,7 @@ class SocketHandler {
 
     console.log(`[SocketHandler] ${player.nickname} uploaded asset: ${fileName} to ${category}`);
 
-    // Send success response to uploader
-    socket.emit(SocketEvents.ASSET_UPLOADED, {
-      success: true,
-      assetId: result.assetId,
-      path: result.path,
-      name: result.name,
-      category,
-      size: result.size,
-      uploadedAt: result.uploadedAt,
-    });
-
-    // Broadcast to all other clients
+    // Broadcast to all clients (including uploader) - single emit
     this.io.emit(SocketEvents.ASSET_UPLOADED, {
       success: true,
       assetId: result.assetId,

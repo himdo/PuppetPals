@@ -2,8 +2,9 @@
  * Tests socket event handling for join, disconnect, and broadcast
  */
 
-const SocketHandler = require('../server/socket-handler');
-const AuthManager = require('../server/auth-manager');
+import SocketHandler from '../server/socket-handler.js';
+import AuthManager from '../server/auth-manager.js';
+import SocketEvents from '../shared/protocols.js';
 
 // Mock socket object for testing
 function createMockSocket(id) {
@@ -96,11 +97,11 @@ describe('SocketHandler registerEvents', () => {
 
     io._connection(mockSocket);
 
-    const joinHandler = mockSocket.getHandler('request-join');
+    const joinHandler = mockSocket.getHandler(SocketEvents.REQUEST_JOIN);
     expect(joinHandler).toBeTruthy();
     joinHandler({ nickname: 'Alice' });
 
-    const emitted = mockSocket.getEmitted('join-confirmed');
+    const emitted = mockSocket.getEmitted(SocketEvents.JOIN_CONFIRMED);
     expect(emitted).toBeTruthy();
     expect(emitted.role).toBe('owner');
     expect(emitted.nickname).toBe('Alice');
@@ -117,14 +118,14 @@ describe('SocketHandler registerEvents', () => {
     const socket1 = createMockSocket('sock-1');
     io.getSockets().set('sock-1', socket1);
     io._connection(socket1);
-    socket1.getHandler('request-join')({ nickname: 'Alice' });
+    socket1.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Alice' });
 
     const socket2 = createMockSocket('sock-2');
     io.getSockets().set('sock-2', socket2);
     io._connection(socket2);
-    socket2.getHandler('request-join')({ nickname: 'Alice' });
+    socket2.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Alice' });
 
-    const errorEmitted = socket2.getEmitted('nickname-taken');
+    const errorEmitted = socket2.getEmitted(SocketEvents.NICKNAME_TAKEN);
     expect(errorEmitted).toBeTruthy();
     expect(errorEmitted.message).toBeTruthy();
   });
@@ -138,9 +139,9 @@ describe('SocketHandler registerEvents', () => {
     const mockSocket = createMockSocket('sock-3');
     io.getSockets().set('sock-3', mockSocket);
     io._connection(mockSocket);
-    mockSocket.getHandler('request-join')({ nickname: 'ab' });
+    mockSocket.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'ab' });
 
-    const errorEmitted = mockSocket.getEmitted('nickname-taken');
+    const errorEmitted = mockSocket.getEmitted(SocketEvents.NICKNAME_TAKEN);
     expect(errorEmitted).toBeTruthy();
   });
 
@@ -153,14 +154,14 @@ describe('SocketHandler registerEvents', () => {
     const socket1 = createMockSocket('s1');
     io.getSockets().set('s1', socket1);
     io._connection(socket1);
-    socket1.getHandler('request-join')({ nickname: 'Alice' });
+    socket1.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Alice' });
 
     const socket2 = createMockSocket('s2');
     io.getSockets().set('s2', socket2);
     io._connection(socket2);
-    socket2.getHandler('request-join')({ nickname: 'Bob' });
+    socket2.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Bob' });
 
-    const emitted = socket2.getEmitted('join-confirmed');
+    const emitted = socket2.getEmitted(SocketEvents.JOIN_CONFIRMED);
     expect(emitted.role).toBe('client');
     expect(emitted.players.length).toBe(2);
   });
@@ -178,14 +179,14 @@ describe('SocketHandler registerEvents', () => {
     const disconnectHandler = mockSocket.getHandler('disconnect');
     expect(disconnectHandler).toBeTruthy();
 
-    mockSocket.getHandler('request-join')({ nickname: 'Alice' });
+    mockSocket.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Alice' });
     expect(auth.getPlayerCount()).toBe(1);
 
     disconnectHandler('io client disconnect');
 
     expect(auth.getPlayerCount()).toBe(0);
     const logs = io.getBroadcastLogs();
-    const disconnectBroadcast = logs.find(l => l.event === 'player-disconnected');
+    const disconnectBroadcast = logs.find(l => l.event === SocketEvents.PLAYER_DISCONNECTED);
     expect(disconnectBroadcast).toBeTruthy();
     expect(disconnectBroadcast.data.nickname).toBe('Alice');
   });
@@ -215,14 +216,14 @@ describe('SocketHandler registerEvents', () => {
     const s1 = createMockSocket('p1');
     io.getSockets().set('p1', s1);
     io._connection(s1);
-    s1.getHandler('request-join')({ nickname: 'Alice' });
+    s1.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Alice' });
 
     const s2 = createMockSocket('p2');
     io.getSockets().set('p2', s2);
     io._connection(s2);
-    s2.getHandler('request-join')({ nickname: 'Bob' });
+    s2.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'Bob' });
 
-    const emitted = s2.getEmitted('join-confirmed');
+    const emitted = s2.getEmitted(SocketEvents.JOIN_CONFIRMED);
     expect(emitted.players.length).toBe(2);
     const playerNames = emitted.players.map(p => p.nickname);
     expect(playerNames).toContain('Alice');
@@ -238,9 +239,9 @@ describe('SocketHandler registerEvents', () => {
     const mockSocket = createMockSocket('session-sock');
     io.getSockets().set('session-sock', mockSocket);
     io._connection(mockSocket);
-    mockSocket.getHandler('request-join')({ nickname: 'TestUser' });
+    mockSocket.getHandler(SocketEvents.REQUEST_JOIN)({ nickname: 'TestUser' });
 
-    const emitted = mockSocket.getEmitted('join-confirmed');
+    const emitted = mockSocket.getEmitted(SocketEvents.JOIN_CONFIRMED);
     expect(emitted.sessionId).toBeTruthy();
     expect(typeof emitted.sessionId).toBe('string');
     expect(emitted.sessionId.length).toBeGreaterThan(0);

@@ -2,6 +2,7 @@
   "name": "puppetpals",
   "version": "1.0.0",
   "description": "Web-based puppet controlling software with real-time synchronized animations",
+  "type": "module",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",

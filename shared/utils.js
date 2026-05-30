@@ -105,7 +105,7 @@ function formatTime(timestamp) {
   return date.toLocaleTimeString();
 }
 
-module.exports = {
+export {
   hashString,
   clamp,
   lerp,

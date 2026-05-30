@@ -76,8 +76,23 @@ const SocketEvents = {
   /** Client requests full asset list */
   ASSET_MANIFEST: 'asset-manifest',
 
+  /** Server responds with asset manifest */
+  ASSET_MANIFEST_RESPONSE: 'asset-manifest-response',
+
   /** Server owner deletes an asset */
   DELETE_ASSET: 'delete-asset',
+
+  /** Server responds to delete request */
+  DELETE_RESULT: 'delete-result',
+
+  /** Server broadcasts asset deletion */
+  ASSET_DELETED: 'asset-deleted',
+
+  /** Upload error response */
+  UPLOAD_ERROR: 'upload-error',
+
+  /** Delete error response */
+  DELETE_ERROR: 'delete-error',
 
   // ---- Puppet Editor ----
   /** Send updated puppet config to server */
@@ -94,19 +109,4 @@ const SocketEvents = {
   SYSTEM_MESSAGE: 'system-message',
 };
 
-/**
- * Payload structures (documentation only)
- *
- * request-join: { nickname: string }
- * join-confirmed: { sessionId: string, role: string, players: Array, puppetConfig: object }
- * nickname-taken: { message: string }
- * player-disconnected: { sessionId: string, nickname: string }
- * move-puppet: { sessionId: string, location: string | { x: number, z: number } }
- * puppet-moved: { sessionId: string, position: { x: number, z: number } }
- * start-animation: { sessionId: string, animationId: string }
- * animation-started: { sessionId: string, animationId: string, startTime: number }
- * animation-state: { sessionId: string, animationId: string, currentTime: number, playing: boolean }
- * state-sync: { players: Array, stageConfig: object }
- */
-
-module.exports = SocketEvents;
+export default SocketEvents;

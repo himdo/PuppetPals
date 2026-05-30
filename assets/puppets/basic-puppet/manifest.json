@@ -1,0 +1,35 @@
+{
+  "name": "Basic Puppet",
+  "parts": [
+    {
+      "name": "head",
+      "type": "part",
+      "required": true
+    },
+    {
+      "name": "body",
+      "type": "part",
+      "required": true
+    },
+    {
+      "name": "leftArm",
+      "type": "part",
+      "required": false
+    },
+    {
+      "name": "rightArm",
+      "type": "part",
+      "required": false
+    },
+    {
+      "name": "leftLeg",
+      "type": "part",
+      "required": false
+    },
+    {
+      "name": "rightLeg",
+      "type": "part",
+      "required": false
+    }
+  ]
+}

@@ -2,8 +2,8 @@
  * Tracks connected clients, assigns roles, and manages nicknames
  */
 
-const { v4: uuidv4 } = require('uuid');
-const { validateNickname } = require('../shared/utils');
+import { v4 as uuidv4 } from 'uuid';
+import { validateNickname } from '../shared/utils.js';
 
 class AuthManager {
   /**
@@ -175,4 +175,4 @@ class AuthManager {
   }
 }
 
-module.exports = AuthManager;
+export default AuthManager;

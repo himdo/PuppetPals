@@ -2,14 +2,15 @@
  * Express + Socket.io server for real-time puppet control
  */
 
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const cors = require('cors');
-const config = require('./config');
-const AuthManager = require('./auth-manager');
-const SocketHandler = require('./socket-handler');
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import path from 'path';
+import cors from 'cors';
+import config from './config.js';
+import AuthManager from './auth-manager.js';
+import SocketHandler from './socket-handler.js';
+import AssetManager from './asset-manager.js';
 
 class PuppetPalsServer {
   constructor() {
@@ -18,6 +19,7 @@ class PuppetPalsServer {
     this.io = null;
     this.connectedClients = new Map();
     this.authManager = new AuthManager(config.maxPlayers);
+    this.assetManager = new AssetManager();
     this.socketHandler = null;
   }
 
@@ -37,6 +39,9 @@ class PuppetPalsServer {
     // Serve client static files
     this.app.use(express.static(path.resolve(config.paths.client)));
 
+    // Serve shared module files (needed for client ES module imports)
+    this.app.use('/shared', express.static(path.resolve(process.cwd(), 'shared')));
+
     // Serve uploaded assets
     this.app.use('/assets', express.static(path.resolve(config.paths.assets)));
   }
@@ -55,8 +60,8 @@ class PuppetPalsServer {
       pingInterval: config.socket.pingInterval,
     });
 
-    // Initialize socket handler with auth manager
-    this.socketHandler = new SocketHandler(this.io, this.authManager);
+    // Initialize socket handler with auth manager and asset manager
+    this.socketHandler = new SocketHandler(this.io, this.authManager, this.assetManager);
     this.socketHandler.registerEvents();
 
     // Track raw connections
@@ -85,6 +90,25 @@ class PuppetPalsServer {
         playersConnected: this.authManager.getPlayerCount(),
         maxPlayers: config.maxPlayers,
       });
+    });
+
+    // Asset manifest API endpoint
+    this.app.get('/api/assets/manifest', (req, res) => {
+      const manifest = this.assetManager.getAssetManifest();
+      res.json(manifest);
+    });
+
+    // Asset search API endpoint
+    this.app.get('/api/assets/search', (req, res) => {
+      const { q = '', category } = req.query;
+      const results = this.assetManager.searchAssets(q, category || null);
+      res.json(results);
+    });
+
+    // Available puppets API endpoint
+    this.app.get('/api/assets/puppets', (req, res) => {
+      const puppets = this.assetManager.getAvailablePuppets();
+      res.json(puppets);
     });
   }
 
@@ -142,4 +166,4 @@ class PuppetPalsServer {
 const server = new PuppetPalsServer();
 server.start();
 
-module.exports = server;
+export default server;

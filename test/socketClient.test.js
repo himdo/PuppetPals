@@ -3,18 +3,18 @@
  * Note: These are unit tests using mocked browser APIs
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 describe('SocketClient', () => {
   it('should be importable as a module', () => {
-    const filePath = path.resolve(__dirname, '../client/js/socket-client.js');
+    const filePath = path.resolve(process.cwd(), 'client/js/socket-client.js');
     expect(fs.existsSync(filePath)).toBe(true);
   });
 
   it('should contain expected class or factory function', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -26,7 +26,7 @@ describe('SocketClient', () => {
 
   it('should reference socket.io connection', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -36,7 +36,7 @@ describe('SocketClient', () => {
 
   it('should have exponential backoff reconnection logic', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     const hasReconnect = content.includes('reconnect') || content.includes('backoff') ||
@@ -46,7 +46,7 @@ describe('SocketClient', () => {
 
   it('should handle join-confirmed event', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -56,7 +56,7 @@ describe('SocketClient', () => {
 
   it('should handle nickname-taken event', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -66,7 +66,7 @@ describe('SocketClient', () => {
 
   it('should handle player-disconnected event', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -76,7 +76,7 @@ describe('SocketClient', () => {
 
   it('should provide emit method for sending events', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -86,7 +86,7 @@ describe('SocketClient', () => {
 
   it('should provide disconnect method', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(
@@ -96,7 +96,7 @@ describe('SocketClient', () => {
 
   it('should have a method to request joining with nickname', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '../client/js/socket-client.js'),
+      path.resolve(process.cwd(), 'client/js/socket-client.js'),
       'utf-8'
     );
     expect(

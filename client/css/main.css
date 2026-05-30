@@ -173,6 +173,34 @@ html, body {
   background-color: #d63851;
 }
 
+.btn-small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  background-color: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-small:hover {
+  background-color: #d63851;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  color: #fff;
+}
+
 /* Stage Container */
 #stage-container {
   width: 100%;
@@ -197,4 +225,293 @@ html, body {
 
 #ui-overlay > * {
   pointer-events: auto;
+}
+
+/* Top Bar */
+#top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+
+.player-info {
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+/* Asset Panel Sidebar */
+#asset-panel {
+  position: fixed;
+  top: 40px;
+  right: 0;
+  width: 320px;
+  height: calc(100% - 40px);
+  background: rgba(22, 33, 62, 0.95);
+  backdrop-filter: blur(8px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 90;
+  transition: transform 0.3s ease;
+}
+
+#asset-panel.hidden {
+  transform: translateX(100%);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-header h3 {
+  font-size: 1rem;
+  color: #e94560;
+}
+
+#asset-browser-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+/* Asset Browser */
+.asset-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.asset-browser h3 {
+  display: none;
+}
+
+/* Asset Tabs */
+.asset-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.asset-tab {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.asset-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #eee;
+}
+
+.asset-tab.active {
+  background: rgba(233, 69, 96, 0.2);
+  border-color: #e94560;
+  color: #e94560;
+}
+
+/* Upload Section */
+.asset-upload-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  align-items: center;
+}
+
+.asset-upload-section button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.asset-upload-section button:hover {
+  background: #d63851;
+}
+
+.asset-upload-section select,
+.asset-upload-section input[type="text"] {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #eee;
+  outline: none;
+}
+
+.asset-upload-section input[type="text"] {
+  flex: 1;
+  min-width: 100px;
+}
+
+/* Asset List */
+.asset-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.asset-empty {
+  text-align: center;
+  color: #666;
+  font-size: 0.85rem;
+  padding: 1rem 0.5rem;
+}
+
+/* Asset Item */
+.asset-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  margin-bottom: 0.4rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.asset-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.asset-thumbnail {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.asset-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 1.2rem;
+  color: #aaa;
+}
+
+.asset-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.asset-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #eee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.asset-size {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.asset-subgroup {
+  font-size: 0.7rem;
+  color: #e94560;
+}
+
+.asset-delete-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.asset-delete-btn:hover {
+  background: rgba(255, 107, 107, 0.4);
+}
+
+/* Asset Actions */
+.asset-actions {
+  padding: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.asset-actions button {
+  width: 100%;
+  padding: 0.4rem;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.asset-actions button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* Notifications */
+.asset-notification {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  z-index: 200;
+  animation: fadeIn 0.3s ease;
+}
+
+.asset-notification-success {
+  background: rgba(40, 167, 69, 0.9);
+  color: #fff;
+}
+
+.asset-notification-error {
+  background: rgba(220, 53, 69, 0.9);
+  color: #fff;
+}
+
+.asset-notification-info {
+  background: rgba(233, 69, 96, 0.9);
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

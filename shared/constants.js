@@ -1,0 +1,57 @@
+/** Shared Constants
+ * Constants used across both server and client
+ */
+
+const CONSTANTS = {
+  /** Maximum players allowed on the server */
+  MAX_PLAYERS: 10,
+
+  /** Nickname validation */
+  NICKNAME_MIN_LENGTH: 3,
+  NICKNAME_MAX_LENGTH: 20,
+
+  /** Player roles */
+  ROLES: {
+    OWNER: 'owner',
+    CLIENT: 'client',
+  },
+
+  /** Stage predefined locations */
+  STAGE_LOCATIONS: {
+    CENTER: { x: 0, z: 0 },
+    STAGE_LEFT: { x: -5, z: 0 },
+    STAGE_RIGHT: { x: 5, z: 0 },
+    UPSTAGE_LEFT: { x: -5, z: -5 },
+    UPSTAGE_RIGHT: { x: 5, z: -5 },
+    DOWNSTAGE_LEFT: { x: -5, z: 5 },
+    DOWNSTAGE_RIGHT: { x: 5, z: 5 },
+  },
+
+  /** Animation types */
+  ANIMATIONS: [
+    'idle',
+    'walk',
+    'run',
+    'jump',
+    'wave',
+    'sit',
+    'dance',
+    'wave-hand',
+  ],
+
+  /** Puppet bone names */
+  BONE_NAMES: [
+    'head',
+    'torso',
+    'upper-arm-l',
+    'lower-arm-l',
+    'upper-arm-r',
+    'lower-arm-r',
+    'upper-leg-l',
+    'lower-leg-l',
+    'upper-leg-r',
+    'lower-leg-r',
+  ],
+};
+
+export default CONSTANTS;

@@ -8,10 +8,12 @@ import Scene from './three/scene.js';
 import Camera from './three/camera.js';
 import Lighting from './three/lighting.js';
 import Stage from './three/stage.js';
+import AssetBrowser from './assets/asset-browser.js';
 
 // DOM Elements
 let joinScreen, joinForm, nicknameInput, serverAddressInput, joinError, joinStatus, gameContainer;
 let socketClient;
+let assetBrowser;
 
 // Three.js components
 let threeRenderer;
@@ -71,6 +73,71 @@ function hideJoinStatus() {
 }
 
 /**
+ * Initialize the Asset Browser after joining
+ */
+function initAssetBrowser() {
+  const container = document.getElementById('asset-browser-container');
+  const rawSocket = socketClient.getSocket();
+
+  if (!container || !rawSocket) return;
+
+  assetBrowser = new AssetBrowser({
+    socket: rawSocket,
+    container: container,
+  });
+
+  // Hide upload section for non-owners
+  const isOwner = window.playerRole === 'owner';
+  const uploadSection = container.querySelector('.asset-upload-section');
+  if (uploadSection) {
+    uploadSection.style.display = isOwner ? 'block' : 'none';
+  }
+
+  // Hide delete buttons for non-owners
+  if (!isOwner) {
+    const style = document.createElement('style');
+    style.textContent = '.asset-delete-btn { display: none !important; }';
+    container.appendChild(style);
+  }
+
+  // Request manifest after a short delay to ensure socket is ready
+  setTimeout(() => {
+    assetBrowser.requestManifest();
+  }, 300);
+}
+
+/**
+ * Setup asset panel toggle buttons
+ */
+function setupAssetPanelToggle() {
+  const toggleBtn = document.getElementById('toggle-asset-panel');
+  const closeBtn = document.getElementById('close-asset-panel');
+  const panel = document.getElementById('asset-panel');
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      panel.classList.toggle('hidden');
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+  }
+}
+
+/**
+ * Update player info display
+ */
+function updatePlayerInfo() {
+  const playerInfo = document.getElementById('player-info');
+  if (playerInfo) {
+    playerInfo.textContent = `${window.nickname} (${window.playerRole})`;
+  }
+}
+
+/**
  * Hide the join screen and show the game
  */
 function enterGame() {
@@ -79,8 +146,17 @@ function enterGame() {
     gameContainer.classList.remove('hidden');
   }
 
+  // Update player info bar
+  updatePlayerInfo();
+
+  // Setup asset panel toggle
+  setupAssetPanelToggle();
+
   // Initialize Three.js scene after entering the game
   initThreeJS();
+
+  // Initialize asset browser
+  initAssetBrowser();
 }
 
 /**
@@ -202,6 +278,9 @@ function stopRenderLoop() {
  */
 function cleanup() {
   stopRenderLoop();
+  if (assetBrowser) {
+    assetBrowser.destroy();
+  }
 }
 
 /**
@@ -255,6 +334,7 @@ function handleJoinConfirmed(data) {
 
   // Store session info
   window.playerRole = data.role;
+  window.nickname = data.nickname;
   window.players = data.players;
 
   // Transition to game view
@@ -307,10 +387,7 @@ function handleReconnectFailed(data) {
 function init() {
   cacheElements();
 
-  // Set default server address
-  if (serverAddressInput && !serverAddressInput.value) {
-    serverAddressInput.placeholder = window.location.origin;
-  }
+  // Server address input has default value in HTML (http://localhost:3000)
 
   // Attach form submit handler
   if (joinForm) {

@@ -2,16 +2,19 @@
  * Manages all socket.io events for player join, disconnect, and broadcasts
  */
 
-const SocketEvents = require('../shared/protocols');
+import SocketEvents from '../shared/protocols.js';
+import AssetManager from './asset-manager.js';
 
 class SocketHandler {
   /**
    * @param {import('socket.io').Server} io - The Socket.io server instance
    * @param {import('./auth-manager')} authManager - The authentication manager
+   * @param {AssetManager} [assetManager] - Optional asset manager instance
    */
-  constructor(io, authManager) {
+  constructor(io, authManager, assetManager = null) {
     this.io = io;
     this.authManager = authManager;
+    this.assetManager = assetManager || new AssetManager();
   }
 
   /**
@@ -29,6 +32,19 @@ class SocketHandler {
       // Handle disconnect
       socket.on('disconnect', (reason) => {
         this.handleDisconnect(socket, reason);
+      });
+
+      // ---- Asset Management Events ----
+      socket.on(SocketEvents.UPLOAD_ASSET, (data) => {
+        this.handleUploadAsset(socket, data);
+      });
+
+      socket.on(SocketEvents.ASSET_MANIFEST, (data) => {
+        this.handleAssetManifest(socket, data);
+      });
+
+      socket.on(SocketEvents.DELETE_ASSET, (data) => {
+        this.handleDeleteAsset(socket, data);
       });
     });
   }
@@ -100,6 +116,168 @@ class SocketHandler {
 
     console.log(`[SocketHandler] ${player.nickname} removed from session`);
   }
+
+  /**
+   * Check if a socket belongs to an authenticated owner
+   * @param {import('socket.io').Socket} socket
+   * @returns {{ authenticated: boolean, player: object | null }}
+   */
+  getPlayerFromSocket(socket) {
+    const player = this.authManager.getPlayerBySocket(socket.id);
+    if (!player) return { authenticated: false, player: null };
+    return { authenticated: true, player };
+  }
+
+  /**
+   * Handle asset upload request
+   * @param {import('socket.io').Socket} socket
+   * @param {{ fileName: string, data: string, category: string, subGroup?: string }} data
+   */
+  handleUploadAsset(socket, data) {
+    const { fileName, data: fileData, category, subGroup } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.UPLOAD_ERROR, {
+        message: 'You must be authenticated to upload assets.',
+      });
+      return;
+    }
+
+    // Check owner role
+    if (!this.authManager.isOwner(player.sessionId)) {
+      socket.emit(SocketEvents.UPLOAD_ERROR, {
+        message: 'Only the server owner can upload assets.',
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!fileName || !fileData || !category) {
+      socket.emit(SocketEvents.UPLOAD_ERROR, {
+        message: 'fileName, data, and category are required.',
+      });
+      return;
+    }
+
+    // Decode base64 data
+    let buffer;
+    try {
+      buffer = Buffer.from(fileData, 'base64');
+    } catch (e) {
+      socket.emit(SocketEvents.UPLOAD_ERROR, {
+        message: 'Invalid file data encoding.',
+      });
+      return;
+    }
+
+    // Add asset via AssetManager
+    const result = this.assetManager.addAsset(fileName, buffer, category, subGroup || null);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.UPLOAD_ERROR, {
+        message: result.error || 'Failed to upload asset.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ${player.nickname} uploaded asset: ${fileName} to ${category}`);
+
+    // Send success response to uploader
+    socket.emit(SocketEvents.ASSET_UPLOADED, {
+      success: true,
+      assetId: result.assetId,
+      path: result.path,
+      name: result.name,
+      category,
+      size: result.size,
+      uploadedAt: result.uploadedAt,
+    });
+
+    // Broadcast to all other clients
+    this.io.emit(SocketEvents.ASSET_UPLOADED, {
+      success: true,
+      assetId: result.assetId,
+      path: result.path,
+      name: result.name,
+      category,
+      size: result.size,
+      uploadedAt: result.uploadedAt,
+      uploadedBy: player.nickname,
+    });
+  }
+
+  /**
+   * Handle asset manifest request
+   * @param {import('socket.io').Socket} socket
+   * @param {object} data
+   */
+  handleAssetManifest(socket, data) {
+    const manifest = this.assetManager.getAssetManifest();
+
+    socket.emit(SocketEvents.ASSET_MANIFEST_RESPONSE, manifest);
+  }
+
+  /**
+   * Handle asset deletion request
+   * @param {import('socket.io').Socket} socket
+   * @param {{ assetId: string, category: string }} data
+   */
+  handleDeleteAsset(socket, data) {
+    const { assetId, category } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.DELETE_ERROR, {
+        message: 'You must be authenticated to delete assets.',
+      });
+      return;
+    }
+
+    // Check owner role
+    if (!this.authManager.isOwner(player.sessionId)) {
+      socket.emit(SocketEvents.DELETE_ERROR, {
+        message: 'Only the server owner can delete assets.',
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!assetId || !category) {
+      socket.emit(SocketEvents.DELETE_ERROR, {
+        message: 'assetId and category are required.',
+      });
+      return;
+    }
+
+    // Delete asset via AssetManager
+    const result = this.assetManager.deleteAsset(assetId, category);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.DELETE_ERROR, {
+        message: result.error || 'Failed to delete asset.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ${player.nickname} deleted asset: ${assetId} from ${category}`);
+
+    // Send success response to requester
+    socket.emit(SocketEvents.DELETE_RESULT, {
+      success: true,
+      assetId,
+      category,
+    });
+
+    // Broadcast deletion to all clients
+    this.io.emit(SocketEvents.ASSET_DELETED, {
+      assetId,
+      category,
+      deletedBy: player.nickname,
+    });
+  }
 }
 
-module.exports = SocketHandler;
+export default SocketHandler;

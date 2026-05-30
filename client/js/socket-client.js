@@ -36,7 +36,8 @@ class SocketClient {
    */
   connect(serverUrl) {
     return new Promise((resolve, reject) => {
-      this.serverUrl = serverUrl || window.location.origin;
+      // Determine the server URL - default to localhost:3000 if not specified
+      this.serverUrl = serverUrl || 'http://localhost:3000';
 
       // Clear any existing reconnection timer
       this._clearReconnectTimer();
@@ -232,6 +233,14 @@ class SocketClient {
       role: this.role,
       nickname: this.nickname,
     };
+  }
+
+  /**
+   * Get the raw socket.io socket instance
+   * @returns {object|null}
+   */
+  getSocket() {
+    return this.socket;
   }
 
   /**

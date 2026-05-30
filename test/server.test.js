@@ -2,7 +2,7 @@
  * Tests server initialization, routes, and socket handling
  */
 
-const http = require('http');
+import http from 'http';
 
 jest.setTimeout(10000);
 
@@ -14,12 +14,8 @@ describe('Server HTTP Endpoints', () => {
     const originalPort = process.env.PORT;
     process.env.PORT = '3099';
 
-    // Clear module cache to reload config with new port
-    delete require.cache[require.resolve('../server/config')];
-    delete require.cache[require.resolve('../server/index.js')];
-
     // Import the server module - it will auto-start
-    server = require('../server/index.js');
+    server = await import('../server/index.js');
 
     // Give the server time to start
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -27,13 +23,9 @@ describe('Server HTTP Endpoints', () => {
 
   afterAll(async () => {
     // Stop the server after all tests
-    if (server && server.stop) {
-      await server.stop().catch(() => {});
+    if (server && server.default && server.default.stop) {
+      await server.default.stop().catch(() => {});
     }
-
-    // Clean up module cache
-    delete require.cache[require.resolve('../server/config')];
-    delete require.cache[require.resolve('../server/index.js')];
   });
 
   it('should respond to health check endpoint', async () => {
@@ -129,14 +121,16 @@ describe('Server HTTP Endpoints', () => {
 });
 
 describe('Server Configuration', () => {
-  it('should export a server instance', () => {
-    const server = require('../server/index.js');
+  it('should export a server instance', async () => {
+    const serverModule = await import('../server/index.js');
+    const server = serverModule.default;
     expect(server).toBeTruthy();
     expect(typeof server.getConnectedCount).toBe('function');
   });
 
-  it('should have connectedClients map', () => {
-    const server = require('../server/index.js');
+  it('should have connectedClients map', async () => {
+    const serverModule = await import('../server/index.js');
+    const server = serverModule.default;
     expect(server.connectedClients).toBeInstanceOf(Map);
   });
 });

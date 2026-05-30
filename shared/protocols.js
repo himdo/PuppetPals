@@ -107,6 +107,31 @@ const SocketEvents = {
   /** Server broadcasts puppet updates to all clients */
   SYNC_PUPPET: 'sync-puppet',
 
+  // ---- Keyframe Animation Editor ----
+  /** Save animation to server */
+  SAVE_ANIMATION: 'save-animation',
+
+  /** Server confirms animation saved and broadcasts to all clients */
+  ANIMATION_SAVED: 'animation-saved',
+
+  /** Load animation from server */
+  LOAD_ANIMATION: 'load-animation',
+
+  /** Server responds with animation data */
+  ANIMATION_LOADED: 'animation-loaded',
+
+  /** Delete animation from server */
+  DELETE_ANIMATION: 'delete-animation',
+
+  /** Server confirms animation deleted and broadcasts */
+  ANIMATION_DELETED: 'animation-deleted',
+
+  /** Get list of all custom animations */
+  LIST_ANIMATIONS: 'list-animations',
+
+  /** Server responds with animation list */
+  ANIMATION_LIST: 'animation-list',
+
   // ---- Chat ----
   /** Send chat message */
   CHAT_MESSAGE: 'chat-message',

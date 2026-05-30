@@ -17,6 +17,8 @@ class SocketHandler {
     this.authManager = authManager;
     this.assetManager = assetManager || new AssetManager();
     this.animationSync = new AnimationSync();
+    /** @type {Map<string, Object>} Store of custom animations keyed by animation id */
+    this.customAnimations = new Map();
   }
 
   /**
@@ -64,6 +66,23 @@ class SocketHandler {
 
       socket.on(SocketEvents.ADMIN_STOP_ANIMATION, (data) => {
         this.handleAdminStopAnimation(socket, data);
+      });
+
+      // ---- Keyframe Animation Editor Events ----
+      socket.on(SocketEvents.SAVE_ANIMATION, (data) => {
+        this.handleSaveAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.LOAD_ANIMATION, (data) => {
+        this.handleLoadAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.DELETE_ANIMATION, (data) => {
+        this.handleDeleteAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.LIST_ANIMATIONS, (data) => {
+        this.handleListAnimations(socket, data);
       });
     });
   }
@@ -319,6 +338,159 @@ class SocketHandler {
     });
 
     console.log(`[SocketHandler] ADMIN ${player.nickname} forced stop animation on ${puppetId}`);
+  }
+
+  // ============================================================
+  // Keyframe Animation Editor Handlers
+  // ============================================================
+
+  /**
+   * Handle save-animation request
+   * @param {import('socket.io').Socket} socket
+   * @param {{ animation: Object }} data
+   */
+  handleSaveAnimation(socket, data) {
+    const { animation } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to save animations.',
+      });
+      return;
+    }
+
+    if (!animation || !animation.id) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'animation with id is required.',
+      });
+      return;
+    }
+
+    // Store the animation (deep copy to avoid reference issues)
+    const stored = JSON.parse(JSON.stringify(animation));
+    stored.savedBy = player.nickname;
+    stored.savedAt = Date.now();
+    this.customAnimations.set(animation.id, stored);
+
+    console.log(`[SocketHandler] ${player.nickname} saved animation: ${animation.id}`);
+
+    // Broadcast to all clients
+    this.io.emit(SocketEvents.ANIMATION_SAVED, {
+      animation: stored,
+      savedBy: player.nickname,
+    });
+  }
+
+  /**
+   * Handle load-animation request
+   * @param {import('socket.io').Socket} socket
+   * @param {{ animationId: string }} data
+   */
+  handleLoadAnimation(socket, data) {
+    const { animationId } = data || {};
+
+    // Check authentication
+    const { authenticated } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to load animations.',
+      });
+      return;
+    }
+
+    if (!animationId) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'animationId is required.',
+      });
+      return;
+    }
+
+    const animation = this.customAnimations.get(animationId);
+    if (!animation) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: `Animation '${animationId}' not found.`,
+      });
+      return;
+    }
+
+    socket.emit(SocketEvents.ANIMATION_LOADED, {
+      animationId,
+      animation,
+    });
+  }
+
+  /**
+   * Handle delete-animation request
+   * @param {import('socket.io').Socket} socket
+   * @param {{ animationId: string }} data
+   */
+  handleDeleteAnimation(socket, data) {
+    const { animationId } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to delete animations.',
+      });
+      return;
+    }
+
+    if (!animationId) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'animationId is required.',
+      });
+      return;
+    }
+
+    const deleted = this.customAnimations.delete(animationId);
+    if (!deleted) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: `Animation '${animationId}' not found.`,
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ${player.nickname} deleted animation: ${animationId}`);
+
+    // Broadcast to all clients
+    this.io.emit(SocketEvents.ANIMATION_DELETED, {
+      animationId,
+      deletedBy: player.nickname,
+    });
+  }
+
+  /**
+   * Handle list-animations request
+   * @param {import('socket.io').Socket} socket
+   * @param {object} data
+   */
+  handleListAnimations(socket, data) {
+    // Check authentication
+    const { authenticated } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ANIMATION_ERROR, {
+        message: 'You must be authenticated to list animations.',
+      });
+      return;
+    }
+
+    const list = [];
+    for (const [id, anim] of this.customAnimations) {
+      list.push({
+        id: anim.id,
+        name: anim.name,
+        duration: anim.duration,
+        loop: anim.loop,
+        keyframeCount: (anim.keyframes || []).length,
+        savedBy: anim.savedBy,
+        savedAt: anim.savedAt,
+      });
+    }
+
+    socket.emit(SocketEvents.ANIMATION_LIST, { animations: list });
   }
 
   // ============================================================

@@ -1,12 +1,26 @@
 /** PuppetPals Client Entry Point
- * Initializes the client application and wires the join screen
+ * Initializes the client application, Three.js scene, and wires the join screen
  */
 
 import SocketClient from './socket-client.js';
+import Renderer from './three/renderer.js';
+import Scene from './three/scene.js';
+import Camera from './three/camera.js';
+import Lighting from './three/lighting.js';
+import Stage from './three/stage.js';
 
 // DOM Elements
 let joinScreen, joinForm, nicknameInput, serverAddressInput, joinError, joinStatus, gameContainer;
 let socketClient;
+
+// Three.js components
+let threeRenderer;
+let threeScene;
+let threeCamera;
+let threeLighting;
+let threeStage;
+let isRendering = false;
+let animationFrameId = null;
 
 /**
  * Cache DOM elements
@@ -64,6 +78,130 @@ function enterGame() {
   if (gameContainer) {
     gameContainer.classList.remove('hidden');
   }
+
+  // Initialize Three.js scene after entering the game
+  initThreeJS();
+}
+
+/**
+ * Initialize all Three.js components
+ */
+function initThreeJS() {
+  const canvas = document.getElementById('stage-canvas');
+  if (!canvas) {
+    console.error('[ThreeJS] Canvas element #stage-canvas not found');
+    return;
+  }
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  // 1. Create the scene
+  threeScene = new Scene();
+
+  // 2. Create the renderer
+  threeRenderer = new Renderer(canvas, {
+    antialias: true,
+    alpha: false,
+    clearColor: 0x1a1a2e,
+    clearAlpha: 1,
+  });
+  threeRenderer.init(width, height);
+
+  // 3. Create the camera
+  threeCamera = new Camera(canvas);
+
+  // 4. Setup lighting
+  threeLighting = new Lighting(threeScene.getScene());
+  threeLighting.setupBasicLighting();
+
+  // 5. Setup the stage
+  threeStage = new Stage(threeScene.getScene());
+  threeStage.setupStage();
+
+  console.log('[ThreeJS] Scene initialized successfully');
+
+  // Start the render loop
+  startRenderLoop();
+
+  // Handle window resize
+  window.addEventListener('resize', handleWindowResize);
+}
+
+/**
+ * Handle window resize events
+ */
+function handleWindowResize() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  if (threeRenderer) {
+    threeRenderer.handleResize(width, height);
+  }
+  if (threeCamera) {
+    threeCamera.handleResize(width, height);
+  }
+}
+
+/**
+ * Start the render loop using requestAnimationFrame
+ */
+function startRenderLoop() {
+  if (isRendering) return;
+  isRendering = true;
+
+  function render() {
+    if (!isRendering) return;
+
+    // Update camera controls
+    if (threeCamera) {
+      threeCamera.update();
+    }
+
+    // Render the scene
+    if (threeRenderer && threeScene && threeCamera) {
+      threeRenderer.render(
+        threeScene.getScene(),
+        threeCamera.getCamera()
+      );
+    }
+
+    animationFrameId = requestAnimationFrame(render);
+  }
+
+  render();
+}
+
+/**
+ * Stop the render loop and clean up Three.js resources
+ */
+function stopRenderLoop() {
+  isRendering = false;
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+
+  // Clean up Three.js resources
+  if (threeCamera) {
+    threeCamera.dispose();
+    threeCamera = null;
+  }
+
+  if (threeRenderer) {
+    threeRenderer.dispose();
+    threeRenderer = null;
+  }
+
+  // Remove resize listener
+  window.removeEventListener('resize', handleWindowResize);
+}
+
+/**
+ * Clean up all resources on page unload
+ */
+function cleanup() {
+  stopRenderLoop();
 }
 
 /**
@@ -194,6 +332,9 @@ function init() {
     nicknameInput.focus();
   }
 }
+
+// Clean up on page unload
+window.addEventListener('beforeunload', cleanup);
 
 // Start the application when the DOM is ready
 if (document.readyState === 'loading') {

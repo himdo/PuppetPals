@@ -2,18 +2,14 @@
  * Tests server initialization, routes, and socket handling
  */
 
-const assert = require('node:assert');
-const { describe, it, beforeEach, afterEach } = require('node:test');
 const http = require('http');
 
-// We need to test the PuppetPalsServer class without it auto-starting
-// Since server/index.js auto-starts, we'll test via HTTP requests
+jest.setTimeout(10000);
 
 describe('Server HTTP Endpoints', () => {
   let server;
-  let httpServer;
 
-  beforeEach((ctx) => {
+  beforeAll(async () => {
     // Set a unique port for testing to avoid conflicts
     const originalPort = process.env.PORT;
     process.env.PORT = '3099';
@@ -23,17 +19,16 @@ describe('Server HTTP Endpoints', () => {
     delete require.cache[require.resolve('../server/index.js')];
 
     // Import the server module - it will auto-start
-    // We need to prevent the default start, so we test the health endpoint
     server = require('../server/index.js');
 
     // Give the server time to start
-    ctx.setTimeout(5000);
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
-  afterEach(() => {
-    // Stop the server after each test
+  afterAll(async () => {
+    // Stop the server after all tests
     if (server && server.stop) {
-      server.stop().catch(() => {});
+      await server.stop().catch(() => {});
     }
 
     // Clean up module cache
@@ -59,10 +54,10 @@ describe('Server HTTP Endpoints', () => {
       });
     });
 
-    assert.strictEqual(response.status, 200);
-    assert.strictEqual(response.data.status, 'ok');
-    assert.ok(typeof response.data.clientsConnected === 'number');
-    assert.ok(typeof response.data.maxPlayers === 'number');
+    expect(response.status).toBe(200);
+    expect(response.data.status).toBe('ok');
+    expect(typeof response.data.clientsConnected).toBe('number');
+    expect(typeof response.data.maxPlayers).toBe('number');
   });
 
   it('should serve client index.html', async () => {
@@ -83,9 +78,9 @@ describe('Server HTTP Endpoints', () => {
       });
     });
 
-    assert.strictEqual(response.status, 200);
-    assert.ok(response.data.includes('PuppetPals'));
-    assert.ok(response.data.includes('loading-screen'));
+    expect(response.status).toBe(200);
+    expect(response.data).toContain('PuppetPals');
+    expect(response.data).toContain('join-screen');
   });
 
   it('should serve client CSS file', async () => {
@@ -106,9 +101,9 @@ describe('Server HTTP Endpoints', () => {
       });
     });
 
-    assert.strictEqual(response.status, 200);
-    assert.ok(response.contentType.includes('text/css'));
-    assert.ok(response.data.includes('loading-screen'));
+    expect(response.status).toBe(200);
+    expect(response.contentType).toContain('text/css');
+    expect(response.data).toContain('loading-screen');
   });
 
   it('should return 404 for non-existent routes', async () => {
@@ -129,19 +124,19 @@ describe('Server HTTP Endpoints', () => {
       });
     });
 
-    assert.strictEqual(response.status, 404);
+    expect(response.status).toBe(404);
   });
 });
 
 describe('Server Configuration', () => {
   it('should export a server instance', () => {
     const server = require('../server/index.js');
-    assert.ok(server);
-    assert.ok(typeof server.getConnectedCount === 'function');
+    expect(server).toBeTruthy();
+    expect(typeof server.getConnectedCount).toBe('function');
   });
 
   it('should have connectedClients map', () => {
     const server = require('../server/index.js');
-    assert.ok(server.connectedClients instanceof Map);
+    expect(server.connectedClients).toBeInstanceOf(Map);
   });
 });

@@ -4,10 +4,14 @@
 
 const config = {
   /** Server port (can be overridden with PORT environment variable) */
-  port: parseInt(process.env.PORT, 10) || 3000,
+  get port() {
+    return parseInt(process.env.PORT, 10) || 3000;
+  },
 
   /** Server hostname (0.0.0.0 to listen on all interfaces) */
-  host: process.env.HOST || '0.0.0.0',
+  get host() {
+    return process.env.HOST || '0.0.0.0';
+  },
 
   /** Maximum number of connected players */
   maxPlayers: 10,

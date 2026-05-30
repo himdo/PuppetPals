@@ -2,9 +2,6 @@
  * Tests shared utility functions
  */
 
-const assert = require('node:assert');
-const { describe, it } = require('node:test');
-
 const {
   hashString,
   clamp,
@@ -17,157 +14,157 @@ const {
 
 describe('hashString', () => {
   it('should return a string', () => {
-    assert.ok(typeof hashString('test') === 'string');
+    expect(typeof hashString('test')).toBe('string');
   });
 
   it('should return consistent results for the same input', () => {
-    assert.strictEqual(hashString('hello'), hashString('hello'));
+    expect(hashString('hello')).toBe(hashString('hello'));
   });
 
   it('should return different results for different inputs', () => {
-    assert.notStrictEqual(hashString('hello'), hashString('world'));
+    expect(hashString('hello')).not.toBe(hashString('world'));
   });
 
   it('should handle empty string', () => {
-    assert.ok(typeof hashString('') === 'string');
+    expect(typeof hashString('')).toBe('string');
   });
 });
 
 describe('clamp', () => {
   it('should return value if within range', () => {
-    assert.strictEqual(clamp(5, 0, 10), 5);
+    expect(clamp(5, 0, 10)).toBe(5);
   });
 
   it('should return min if value is below range', () => {
-    assert.strictEqual(clamp(-5, 0, 10), 0);
+    expect(clamp(-5, 0, 10)).toBe(0);
   });
 
   it('should return max if value is above range', () => {
-    assert.strictEqual(clamp(15, 0, 10), 10);
+    expect(clamp(15, 0, 10)).toBe(10);
   });
 
   it('should return min if value equals min', () => {
-    assert.strictEqual(clamp(0, 0, 10), 0);
+    expect(clamp(0, 0, 10)).toBe(0);
   });
 
   it('should return max if value equals max', () => {
-    assert.strictEqual(clamp(10, 0, 10), 10);
+    expect(clamp(10, 0, 10)).toBe(10);
   });
 });
 
 describe('lerp', () => {
   it('should return start value when t is 0', () => {
-    assert.strictEqual(lerp(0, 10, 0), 0);
+    expect(lerp(0, 10, 0)).toBe(0);
   });
 
   it('should return end value when t is 1', () => {
-    assert.strictEqual(lerp(0, 10, 1), 10);
+    expect(lerp(0, 10, 1)).toBe(10);
   });
 
   it('should return midpoint when t is 0.5', () => {
-    assert.strictEqual(lerp(0, 10, 0.5), 5);
+    expect(lerp(0, 10, 0.5)).toBe(5);
   });
 
   it('should handle negative values', () => {
-    assert.strictEqual(lerp(-10, 10, 0.5), 0);
+    expect(lerp(-10, 10, 0.5)).toBe(0);
   });
 });
 
 describe('lerpVector', () => {
   it('should interpolate all components', () => {
     const result = lerpVector({ x: 0, y: 0, z: 0 }, { x: 10, y: 20, z: 30 }, 0.5);
-    assert.deepStrictEqual(result, { x: 5, y: 10, z: 15 });
+    expect(result).toEqual({ x: 5, y: 10, z: 15 });
   });
 
   it('should return start vector when t is 0', () => {
     const result = lerpVector({ x: 1, y: 2, z: 3 }, { x: 10, y: 20, z: 30 }, 0);
-    assert.deepStrictEqual(result, { x: 1, y: 2, z: 3 });
+    expect(result).toEqual({ x: 1, y: 2, z: 3 });
   });
 
   it('should return end vector when t is 1', () => {
     const result = lerpVector({ x: 1, y: 2, z: 3 }, { x: 10, y: 20, z: 30 }, 1);
-    assert.deepStrictEqual(result, { x: 10, y: 20, z: 30 });
+    expect(result).toEqual({ x: 10, y: 20, z: 30 });
   });
 });
 
 describe('distance2D', () => {
   it('should return 0 for same point', () => {
-    assert.strictEqual(distance2D(0, 0, 0, 0), 0);
+    expect(distance2D(0, 0, 0, 0)).toBe(0);
   });
 
   it('should return correct distance for horizontal line', () => {
-    assert.strictEqual(distance2D(0, 0, 5, 0), 5);
+    expect(distance2D(0, 0, 5, 0)).toBe(5);
   });
 
   it('should return correct distance for vertical line', () => {
-    assert.strictEqual(distance2D(0, 0, 0, 5), 5);
+    expect(distance2D(0, 0, 0, 5)).toBe(5);
   });
 
   it('should return correct distance for diagonal', () => {
     const dist = distance2D(0, 0, 3, 4);
-    assert.strictEqual(dist, 5); // 3-4-5 triangle
+    expect(dist).toBe(5); // 3-4-5 triangle
   });
 });
 
 describe('validateNickname', () => {
   it('should reject empty nickname', () => {
     const result = validateNickname('');
-    assert.strictEqual(result.valid, false);
-    assert.ok(result.error);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeTruthy();
   });
 
   it('should reject null nickname', () => {
     const result = validateNickname(null);
-    assert.strictEqual(result.valid, false);
+    expect(result.valid).toBe(false);
   });
 
   it('should reject nickname too short', () => {
     const result = validateNickname('ab');
-    assert.strictEqual(result.valid, false);
-    assert.ok(result.error.includes('3 characters'));
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('3 characters');
   });
 
   it('should reject nickname too long', () => {
     const result = validateNickname('a'.repeat(21));
-    assert.strictEqual(result.valid, false);
-    assert.ok(result.error.includes('20 characters'));
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('20 characters');
   });
 
   it('should reject nickname with invalid characters', () => {
     const result = validateNickname('hello world');
-    assert.strictEqual(result.valid, false);
-    assert.ok(result.error.includes('letters, numbers'));
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('letters, numbers');
   });
 
   it('should accept valid nickname with minimum length', () => {
     const result = validateNickname('abc');
-    assert.strictEqual(result.valid, true);
-    assert.strictEqual(result.error, null);
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeNull();
   });
 
   it('should accept valid nickname with maximum length', () => {
     const result = validateNickname('a'.repeat(20));
-    assert.strictEqual(result.valid, true);
+    expect(result.valid).toBe(true);
   });
 
   it('should accept nickname with underscores and hyphens', () => {
     const result = validateNickname('player_1-test');
-    assert.strictEqual(result.valid, true);
+    expect(result.valid).toBe(true);
   });
 
   it('should trim whitespace before validation', () => {
     const result = validateNickname('  abc  ');
-    assert.strictEqual(result.valid, true);
+    expect(result.valid).toBe(true);
   });
 });
 
 describe('formatTime', () => {
   it('should return a string', () => {
-    assert.ok(typeof formatTime(Date.now()) === 'string');
+    expect(typeof formatTime(Date.now())).toBe('string');
   });
 
   it('should return consistent format for same timestamp', () => {
     const ts = Date.now();
-    assert.strictEqual(formatTime(ts), formatTime(ts));
+    expect(formatTime(ts)).toBe(formatTime(ts));
   });
 });

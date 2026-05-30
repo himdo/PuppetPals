@@ -3,143 +3,104 @@
  * Note: These are unit tests using mocked browser APIs
  */
 
-const assert = require('node:assert');
-const { describe, it } = require('node:test');
+const fs = require('fs');
+const path = require('path');
 
-// Simulate minimal browser environment for testing
-// The SocketClient is a browser module, so we test the logic in Node
-
-// Mock the SocketClient class behavior we expect
 describe('SocketClient', () => {
-  // Since SocketClient is a client-side module using socket.io-client (browser),
-  // we test the configuration and logic patterns that the module should follow.
-  // The actual socket.io-client library won't be available in Node without extra setup.
-
   it('should be importable as a module', () => {
-    // The module exists and is a JS file
-    const fs = require('fs');
-    const path = require('path');
     const filePath = path.resolve(__dirname, '../client/js/socket-client.js');
-    assert.ok(fs.existsSync(filePath), 'socket-client.js should exist');
+    expect(fs.existsSync(filePath)).toBe(true);
   });
 
   it('should contain expected class or factory function', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    // Should define a class or exported function
-    assert.ok(
+    expect(
       content.includes('class SocketClient') || content.includes('function SocketClient') ||
       content.includes('export class') || content.includes('export function') ||
-      content.includes('module.exports'),
-      'Should export a SocketClient class or function'
-    );
+      content.includes('module.exports')
+    ).toBe(true);
   });
 
   it('should reference socket.io connection', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('io(') || content.includes('socket') || content.includes('connect'),
-      'Should contain socket connection logic'
-    );
+    expect(
+      content.includes('io(') || content.includes('socket') || content.includes('connect')
+    ).toBe(true);
   });
 
   it('should have exponential backoff reconnection logic', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    // Should have some form of reconnection/backoff
     const hasReconnect = content.includes('reconnect') || content.includes('backoff') ||
       content.includes('retry') || content.includes('delay');
-    assert.ok(hasReconnect, 'Should contain reconnection logic');
+    expect(hasReconnect).toBe(true);
   });
 
   it('should handle join-confirmed event', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('join-confirmed') || content.includes('JOIN_CONFIRMED'),
-      'Should listen for join-confirmed event'
-    );
+    expect(
+      content.includes('join-confirmed') || content.includes('JOIN_CONFIRMED')
+    ).toBe(true);
   });
 
   it('should handle nickname-taken event', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('nickname-taken') || content.includes('NICKNAME_TAKEN'),
-      'Should listen for nickname-taken event'
-    );
+    expect(
+      content.includes('nickname-taken') || content.includes('NICKNAME_TAKEN')
+    ).toBe(true);
   });
 
   it('should handle player-disconnected event', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('player-disconnected') || content.includes('PLAYER_DISCONNECTED'),
-      'Should listen for player-disconnected event'
-    );
+    expect(
+      content.includes('player-disconnected') || content.includes('PLAYER_DISCONNECTED')
+    ).toBe(true);
   });
 
   it('should provide emit method for sending events', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('emit') && content.includes('request-join'),
-      'Should emit request-join event'
-    );
+    expect(
+      content.includes('emit') && content.includes('request-join')
+    ).toBe(true);
   });
 
   it('should provide disconnect method', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('disconnect') || content.includes('close'),
-      'Should provide disconnect/disconnect capability'
-    );
+    expect(
+      content.includes('disconnect') || content.includes('close')
+    ).toBe(true);
   });
 
   it('should have a method to request joining with nickname', () => {
-    const fs = require('fs');
-    const path = require('path');
     const content = fs.readFileSync(
       path.resolve(__dirname, '../client/js/socket-client.js'),
       'utf-8'
     );
-    assert.ok(
-      content.includes('request-join') || content.includes('join'),
-      'Should have join functionality'
-    );
+    expect(
+      content.includes('request-join') || content.includes('join')
+    ).toBe(true);
   });
 });

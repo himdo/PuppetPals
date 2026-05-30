@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test/auth.test.js test/socketHandler.test.js test/socketClient.test.js test/config.test.js test/utils.test.js test/constants.test.js test/protocols.test.js test/server.test.js"
   },
   "author": "",
   "license": "ISC",

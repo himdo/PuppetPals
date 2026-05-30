@@ -7,42 +7,38 @@
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-  <!-- Loading Screen -->
-  <div id="loading-screen">
-    <div class="loading-content">
-      <h1 class="loading-title">PuppetPals</h1>
-      <div class="loading-spinner"></div>
-      <p class="loading-text">Loading...</p>
-    </div>
-  </div>
-
-  <!-- Join Screen (hidden by default) -->
-  <div id="join-screen" class="hidden">
+  <!-- Join Screen -->
+  <div id="join-screen">
     <div class="join-content">
-      <h1>PuppetPals</h1>
-      <div class="join-form">
+      <h1 class="join-title">PuppetPals</h1>
+      <p class="join-subtitle">Enter your nickname to join the stage</p>
+      <form id="join-form" class="join-form">
         <div class="form-group">
           <label for="server-address">Server Address</label>
-          <input type="text" id="server-address" placeholder="Current origin" />
+          <input type="text" id="server-address" placeholder="Leave blank for current origin" />
         </div>
         <div class="form-group">
           <label for="nickname">Nickname</label>
-          <input type="text" id="nickname" placeholder="Enter your nickname" minlength="3" maxlength="20" />
+          <input type="text" id="nickname" placeholder="Enter your nickname (3-20 chars)" minlength="3" maxlength="20" required autocomplete="off" />
         </div>
         <div id="join-error" class="error-message hidden"></div>
-        <button id="connect-btn" class="btn btn-primary">Connect</button>
-      </div>
+        <button type="submit" id="connect-btn" class="btn btn-primary">Connect</button>
+      </form>
+      <div id="join-status" class="join-status hidden"></div>
     </div>
   </div>
 
-  <!-- 3D Stage Container (hidden by default) -->
-  <div id="stage-container" class="hidden">
-    <canvas id="stage-canvas"></canvas>
-  </div>
+  <!-- Game Container (hidden until joined) -->
+  <div id="game-container" class="hidden">
+    <!-- 3D Stage Container -->
+    <div id="stage-container">
+      <canvas id="stage-canvas"></canvas>
+    </div>
 
-  <!-- UI Overlays (hidden by default) -->
-  <div id="ui-overlay" class="hidden">
-    <!-- Panels will be injected here dynamically -->
+    <!-- UI Overlays -->
+    <div id="ui-overlay">
+      <!-- Panels will be injected here dynamically -->
+    </div>
   </div>
 
   <!-- Client scripts -->

@@ -8,6 +8,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 const cors = require('cors');
 const config = require('./config');
+const AuthManager = require('./auth-manager');
+const SocketHandler = require('./socket-handler');
 
 class PuppetPalsServer {
   constructor() {
@@ -15,6 +17,8 @@ class PuppetPalsServer {
     this.server = null;
     this.io = null;
     this.connectedClients = new Map();
+    this.authManager = new AuthManager(config.maxPlayers);
+    this.socketHandler = null;
   }
 
   /**
@@ -51,14 +55,19 @@ class PuppetPalsServer {
       pingInterval: config.socket.pingInterval,
     });
 
+    // Initialize socket handler with auth manager
+    this.socketHandler = new SocketHandler(this.io, this.authManager);
+    this.socketHandler.registerEvents();
+
+    // Track raw connections
     this.io.on('connection', (socket) => {
       console.log(`[Socket.io] Client connected: ${socket.id}`);
       this.connectedClients.set(socket.id, {
         connectedAt: Date.now(),
       });
 
-      socket.on('disconnect', (reason) => {
-        console.log(`[Socket.io] Client disconnected: ${socket.id} (${reason})`);
+      socket.on('disconnect', () => {
+        console.log(`[Socket.io] Client disconnected: ${socket.id}`);
         this.connectedClients.delete(socket.id);
       });
     });
@@ -73,6 +82,7 @@ class PuppetPalsServer {
       res.json({
         status: 'ok',
         clientsConnected: this.connectedClients.size,
+        playersConnected: this.authManager.getPlayerCount(),
         maxPlayers: config.maxPlayers,
       });
     });

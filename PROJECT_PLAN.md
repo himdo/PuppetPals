@@ -1169,6 +1169,670 @@ const SERVER_EVENTS = {
   rotation: { x: 0, y: 0, z: 0 },
   currentAnimation: 'animation-id' | null,
   animationTime: 0,
-  isLocked: false,
-  isOffStage: false
+   isLocked: false,
+   isOffStage: false
 }
+
+---
+
+# Phase 2: 2D Multi-Location Stage System
+
+**Background:** The original 14 requests implemented a 3D puppet stage with free-form positioning. The client now requires a 2D side-view puppet theater with a slot-based location system. Puppets move between 7 positions (5 on-screen + 2 off-screen) arranged in a circular cycle, with Z-axis layering for depth control of puppet parts.
+
+---
+
+## Request 15: Orthographic 2D Camera & Side-View Stage
+
+**Priority:** P0 - Foundation
+**Dependencies:** Request 3 (Three.js 3D Scene Setup)
+
+### Description
+
+Convert the rendering system from a 3D perspective view to a 2D orthographic side-view, resembling a traditional puppet theater. The camera should be fixed in a side-on orientation with no rotation or zoom by default.
+
+### Requirements
+
+1. **Replace PerspectiveCamera with OrthographicCamera** in `client/js/three/camera.js`:
+   - Use `THREE.OrthographicCamera` instead of `THREE.PerspectiveCamera`
+   - Configure frustum to match the viewport aspect ratio: `left: -width/2, right: width/2, top: height/2, bottom: -height/2, near: -100, far: 100`
+   - Position camera at `(0, 0, 10)` looking toward `-Z` axis (side view)
+   - Remove orbit controls (camera is fixed for 2D theater view)
+   - Optional: Add zoom in/out buttons (+/-) that adjust the frustum uniformly
+
+2. **Update `client/js/three/renderer.js`**:
+   - Ensure clear color uses a neutral background (e.g., `#1a1a2e` or a dark theater backdrop)
+   - Disable depth-based sorting artifacts; enable alpha sorting for sprite rendering
+   - Set `renderer.sortObjects = true` to ensure Z-order rendering
+
+3. **Update `client/js/three/stage.js`**:
+   - Replace 3D ground plane with a 2D stage floor (horizontal bar at bottom)
+   - Add a stage backdrop plane at `z: -1` as the background layer
+   - Remove grid helper (not needed for 2D view)
+   - Add visual location slot markers (subtle vertical lines or icons) at each of the 7 positions projected onto the 2D plane
+
+4. **Update `client/js/three/lighting.js`**:
+   - Simplify lighting for 2D: single ambient light at intensity 1.0 is sufficient
+   - Remove directional/point lights (unneeded for unlit sprite rendering in 2D)
+   - Use `MeshBasicMaterial` or `SpriteMaterial` for puppet parts (no shading needed)
+
+5. **Window resize handling**:
+   - Recalculate orthographic frustum on resize to maintain proper aspect ratio
+   - Keep stage centered at all viewport sizes
+
+### Deliverables
+
+- OrthographicCamera with fixed side-view orientation
+- 2D stage with floor, backdrop, and slot markers
+- Simplified lighting for unlit 2D sprites
+- Proper Z-order rendering with alpha sorting
+- Responsive frustum on window resize
+
+### Acceptance Criteria
+
+- [ ] Stage renders in true 2D orthographic projection (no perspective distortion)
+- [ ] Camera is fixed in side view (no rotation/zoom by mouse)
+- [ ] Stage backdrop displays behind all puppets
+- [ ] Stage floor is visible at the bottom of the view
+- [ ] Location slot markers are visible on stage
+- [ ] Window resize maintains correct aspect ratio without distortion
+- [ ] All puppet sprites render correctly with transparency
+
+---
+
+## Request 16: Z-Axis Layering System for Puppet Parts
+
+**Priority:** P0 - Foundation
+**Dependencies:** Request 5 (Bone & Skeleton System), Request 15
+
+### Description
+
+Add Z-axis depth control to individual puppet parts (bones) so that when building puppets in the editor, each part can be assigned to its own layer. This ensures correct rendering order when multiple parts overlap in the 2D view (e.g., arms in front of torso, head in front of arms).
+
+### Requirements
+
+1. **Extend `client/js/puppet/bone.js`**:
+   - Add `zDepth` property to Bone class (default: `0`)
+   - `zDepth` controls the Z position of the bone's mesh in the Three.js scene
+   - Higher `zDepth` values render in front of lower values
+   - Update `updateWorldTransform()` to apply `zDepth` to the mesh's Z position
+   - Add `setZDepth(value)` and `getZDepth()` methods
+
+2. **Extend `client/js/puppet/skeleton.js`**:
+   - Parse `zDepth` from skeleton JSON configuration
+   - After building hierarchy, sort child bones by `zDepth` for correct render order
+   - Add `getBonesByZOrder()` method that returns bones sorted ascending by `zDepth`
+
+3. **Update skeleton JSON format** to support `zDepth`:
+
+   ```json
+   {
+     "id": "torso",
+     "name": "Torso",
+     "parentId": null,
+     "asset": "torso.png",
+     "position": { "x": 0, "y": 0, "z": 0 },
+     "zDepth": 0,
+     "scale": { "x": 1, "y": 1 }
+   },
+   {
+     "id": "head",
+     "name": "Head",
+     "parentId": "torso",
+     "asset": "head.png",
+     "socketOffset": { "x": 0, "y": 1.2 },
+     "zDepth": 1,
+     "scale": { "x": 0.8, "y": 0.8 }
+   }
+   ```
+
+4. **Update `client/js/puppet/mesh-loader.js`**:
+   - Ensure loaded meshes use `MeshBasicMaterial` with `transparent: true, depthWrite: false` for proper 2D sprite overlap
+   - Apply `zDepth` offset when positioning the mesh
+
+5. **Default puppet asset update**:
+   - Update the default `skeleton.json` to include sensible `zDepth` values:
+     - Background elements: `-2` to `-1`
+     - Legs: `0`
+     - Torso: `1`
+     - Arms: `2`
+     - Head: `3`
+     - Foreground accessories: `4+`
+
+### Deliverables
+
+- `zDepth` property on Bone class with get/set methods
+- Skeleton JSON format extended with `zDepth` field
+- Bones sorted and rendered in Z order
+- Mesh loader supports transparent sprite rendering
+- Default puppet updated with Z-depth values
+
+### Acceptance Criteria
+
+- [ ] Each bone can have an independent `zDepth` value
+- [ ] Bones with higher `zDepth` render in front of bones with lower `zDepth`
+- [ ] Transparent PNG parts overlap correctly without depth artifacts
+- [ ] Skeleton loads `zDepth` from JSON configuration
+- [ ] Default puppet renders with correct part layering (head in front of torso, etc.)
+- [ ] Changing a bone's `zDepth` at runtime updates its render order immediately
+
+---
+
+## Request 17: Puppet Editor Z-Depth Control
+
+**Priority:** P1 - Important
+**Dependencies:** Request 7 (Puppet Editor), Request 16
+
+### Description
+
+Extend the in-browser puppet editor to allow users to assign Z-depth layers to each puppet part visually. This enables precise control over which parts appear in front of or behind others in the 2D view.
+
+### Requirements
+
+1. **Extend `client/js/puppet/puppet-editor.js`**:
+   - Add Z-depth control to the bone properties panel
+   - Support setting `zDepth` via slider and direct number input
+   - Recommended range: `-10` to `+10` (covers most use cases)
+   - Add "Reorder" button: automatically assign Z-depth values based on bone selection order or Y position
+
+2. **Update editor UI** (`client/css/editor.css` + HTML):
+   - Add Z-depth slider to selected bone properties panel:
+     ```
+     Z-Depth: [-10] ◄────●────► [+10]
+     ```
+   - Add visual layer indicator next to each bone in the hierarchy tree:
+     - Small badge showing the Z-depth value (e.g., `[Z:3]`)
+   - Add "Sort by Y Position" button to auto-assign Z-depth based on vertical position (higher Y = higher Z-depth)
+
+3. **Visual feedback in editor**:
+   - When a bone is selected, show a visual layer guide line at its Z-depth
+   - Display a 2D wireframe overlay showing all bones' Z-order
+   - Add "Toggle Z preview" button to show a depth-sorted side view
+
+4. **Save/Export**:
+   - Ensure exported skeleton JSON includes `zDepth` for all bones
+   - Validate that saved puppets have Z-depth values (default to `0` if missing)
+
+### Deliverables
+
+- Z-depth slider and input in bone properties panel
+- Layer badge on each bone in hierarchy tree
+- Auto-sort by Y position feature
+- Z-depth included in exported JSON
+- Visual Z-order preview in editor
+
+### Acceptance Criteria
+
+- [ ] User can set Z-depth for any bone using slider or number input
+- [ ] Z-depth range is -10 to +10
+- [ ] Each bone in the hierarchy tree shows its Z-depth badge
+- [ ] "Sort by Y Position" correctly auto-assigns Z-depth values
+- [ ] Exported JSON includes zDepth for all bones
+- [ ] Changes to Z-depth are previewed in real-time
+- [ ] Saved puppet retains Z-depth values after reload
+
+---
+
+## Request 18: Stage Location System (7 Position Slots)
+
+**Priority:** P0 - Core
+**Dependencies:** Request 11 (Game State Management), Request 15
+
+### Description
+
+Replace the free-form stage positioning with a slot-based location system. The stage has 7 position slots arranged in a circular cycle: 5 evenly-spaced on-screen positions and 2 off-screen positions to the left. The number of on-screen slots is configurable by the admin (default: 5), and slots are always evenly distributed across the viewport width.
+
+### Requirements
+
+1. **Create `client/js/stage/location-system.js`**:
+
+   - `LocationSystem` class to manage all stage positions
+   - Properties:
+     - `onScreenCount`: Number of on-screen slots (default: 5, min: 2, max: 10)
+     - `stageWidth`: Calculated from viewport
+     - `stageHeight`: Calculated from viewport
+     - `locations`: Array of all location objects
+
+   - Location object structure:
+     ```javascript
+     {
+       id: 'slot-0' through 'slot-4',     // On-screen slots
+       id: 'offscreen-left',               // Just off screen left
+       id: 'offscreen-far-left',           // Far off screen left
+       x: number,                          // X position in world space
+       y: number,                          // Y position (always stage floor level)
+       z: number,                          // Z position for depth
+       isOffScreen: boolean,
+       label: string                       // Display name
+     }
+     ```
+
+   - Methods:
+     - `calculatePositions()`: Recalculate all slot positions based on `onScreenCount` and viewport
+     - `getLocation(index)`: Get location by cycle index (0 to total-1)
+     - `getNextLocation(index, direction)`: Get next location in direction (`'left'` or `'right'`), with wrap-around
+     - `getLocationByPuppetId(puppetId)`: Get current location of a puppet
+     - `setOnScreenCount(count)`: Update number of on-screen slots and recalculate
+     - `getAllLocations()`: Return all locations
+
+2. **Position Calculation Logic**:
+   - On-screen slots: evenly divide the visible stage width
+     - `slotWidth = stageWidth / onScreenCount`
+     - `slot[i].x = -stageWidth/2 + slotWidth * (i + 0.5)` for i in 0..onScreenCount-1
+   - Off-screen slot 1 (`offscreen-left`): positioned just beyond the left edge (`x = -stageWidth/2 - puppetWidth * 0.5`)
+   - Off-screen slot 2 (`offscreen-far-left`): positioned fully hidden (`x = -stageWidth/2 - puppetWidth * 1.5`)
+   - All slots share the same Y position (stage floor level, e.g., `y = -stageHeight * 0.35`)
+
+3. **Circular Cycle Order** (with default 5 on-screen):
+   ```
+   Index 0: offscreen-far-left
+   Index 1: offscreen-left
+   Index 2: slot-0 (far left)
+   Index 3: slot-1 (mid left)
+   Index 4: slot-2 (center)
+   Index 5: slot-3 (mid right)
+   Index 6: slot-4 (far right)
+   ```
+   - Moving RIGHT from index 6 (far right) wraps to index 0 (offscreen-far-left)
+   - Moving LEFT from index 0 (offscreen-far-left) wraps to index 6 (far right)
+
+4. **Update `server/game-state.js`**:
+   - Replace free-form position tracking with slot-based positions
+   - Add `currentSlotIndex` to each player state
+   - Add `onScreenSlotCount` to global stage config (default: 5)
+   - Methods:
+     - `movePlayerDirection(playerId, direction)`: Move one slot left or right with wrap
+     - `getPlayerSlotIndex(playerId)`: Get current slot index
+     - `setOnScreenSlotCount(count)`: Admin changes number of slots
+     - `getSlotPositions()`: Return calculated slot positions for current count
+
+5. **Socket events** (add to `shared/protocols.js`):
+   - `move-direction` (client → server): `{ playerId, direction: 'left' | 'right' }`
+   - `slot-moved` (server → clients): `{ playerId, fromIndex, toIndex, direction }`
+   - `stage-config-update` (server → clients): `{ onScreenSlotCount, slotPositions }`
+
+### Deliverables
+
+- LocationSystem class with position calculation
+- 7-slot circular cycle (2 off-screen + 5 on-screen by default)
+- Configurable on-screen slot count (admin-controlled)
+- Server-side slot-based game state
+- Socket events for slot movement and stage config
+
+### Acceptance Criteria
+
+- [ ] 7 total locations calculated correctly (2 off-screen + 5 on-screen default)
+- [ ] On-screen slots are evenly distributed across viewport width
+- [ ] Off-screen-left is just beyond visible area
+- [ ] Off-screen-far-left is fully hidden for wide puppets
+- [ ] Moving right from far right wraps to off-screen-far-left
+- [ ] Moving left from off-screen-far-left wraps to far right
+- [ ] Changing on-screen slot count recalculates all positions
+- [ ] Multiple puppets can occupy the same slot
+- [ ] Slot positions update on window resize
+
+---
+
+## Request 19: Puppet Movement Controls & Smooth Transitions
+
+**Priority:** P1 - Core
+**Dependencies:** Request 18, Request 8 (Animation System)
+
+### Description
+
+Implement left/right movement buttons for each puppet owner, with smooth wiggling motion transitions between slots, automatic walk animation triggering, and sprite direction flipping based on movement direction.
+
+### Requirements
+
+1. **Create movement control UI** in `client/js/ui/ui-manager.js`:
+   - Add a persistent movement bar at the bottom of the screen for the user's own puppet:
+     ```
+     [◄ LEFT]  ─── [Current: Slot 3 / On-Screen] ───  [RIGHT ►]
+     ```
+   - Buttons should be large, touch-friendly, and always visible
+   - Display current location label and slot indicator
+   - When puppet is off-screen, show a prominent "OFF-SCREEN" indicator with a "Move On-Stage" quick button
+
+2. **Implement client-side movement logic** in `client/js/app-state.js`:
+   - On button click, emit `move-direction` socket event
+   - Disable buttons briefly during transition (configurable duration, default: 500ms) to prevent button mashing
+   - Update local slot index optimistically, then correct on server confirmation
+
+3. **Smooth wiggling motion** in `client/js/puppet/puppet.js`:
+   - Add `moveToSlot(targetX, duration, direction)` method
+   - Use a sine-wave offset during translation for "wiggling" effect:
+     ```javascript
+     // Pseudo-code for wiggle interpolation
+     wiggleAmount = Math.sin(progress * Math.PI * wiggleFrequency) * wiggleAmplitude * (1 - progress);
+     currentX = startX + (targetX - startX) * progress + wiggleAmount;
+     ```
+   - Configurable parameters:
+     - `transitionDuration`: 400ms default
+     - `wiggleFrequency`: 3 cycles per transition
+     - `wiggleAmplitude`: 5px max displacement
+   - Add `setFacingDirection(direction)` method:
+     - `'left'`: scale.x = -1 (flip sprite horizontally)
+     - `'right'`: scale.x = 1 (normal)
+     - Apply to root bone and all children
+
+4. **Automatic animation triggering** in `client/js/animation/animation-system.js`:
+   - When movement starts, automatically play `walk` animation if available
+   - If `walk` animation doesn't exist for the puppet, use neutral idle pose
+   - When movement completes, stop walk animation and return to `idle` (or whatever was playing before)
+   - Add `onMovementStart()` and `onMovementEnd()` lifecycle hooks in AnimationSystem
+
+5. **Sprite direction logic**:
+   - Puppet always faces direction of movement
+   - When wrapping around (far right → off-screen-far-left), face left
+   - When wrapping around (off-screen-far-left → far right), face right
+   - Puppet retains last facing direction when idle
+
+6. **Update `client/js/puppet/puppet.js`**:
+   - Add `currentSlotIndex` property
+   - Add `facingDirection` property (`'left'` | `'right'`, default: `'right'`)
+   - Add `isMoving` property (true during transition)
+   - Add `targetSlotIndex` property
+   - Update `update()` to handle wiggling transition interpolation
+
+### Deliverables
+
+- Left/right movement buttons in UI
+- Smooth wiggling motion between slots
+- Automatic walk animation during movement
+- Sprite flip based on movement direction
+- Off-screen indicator and quick on-stage button
+- Button cooldown during transitions
+
+### Acceptance Criteria
+
+- [ ] Left button moves puppet one slot left in cycle
+- [ ] Right button moves puppet one slot right in cycle
+- [ ] Movement uses smooth wiggling animation (not instant teleport)
+- [ ] Walk animation plays during movement, idle resumes after
+- [ ] Puppet sprite flips to face movement direction
+- [ ] Wrap-around works: far right + right → off-screen-far-left
+- [ ] Wrap-around works: off-screen-far-left + left → far right
+- [ ] "OFF-SCREEN" indicator visible when puppet is off-screen
+- [ ] "Move On-Stage" button moves puppet to nearest on-screen slot
+- [ ] Buttons are disabled briefly during active transition
+- [ ] All clients see the smooth transition animation
+
+---
+
+## Request 20: Admin Panel - Location Management & Puppet Controls
+
+**Priority:** P2 - Important
+**Dependencies:** Request 12 (Admin Panel), Request 18
+
+### Description
+
+Extend the admin panel to support managing stage location slots and controlling puppet positions for all connected players using the slot-based system.
+
+### Requirements
+
+1. **Extend `server/admin-controller.js`**:
+   - Add `setOnScreenSlotCount(count)`: Change number of on-screen slots (broadcasts new config)
+   - Add `movePuppetDirection(playerId, direction)`: Move a specific puppet one slot left or right
+   - Add `movePuppetToSlot(playerId, slotIndex)`: Move a specific puppet to an exact slot index
+   - Add `getPuppetSlotInfo(playerId)`: Return slot info for a puppet
+
+2. **Extend `client/js/ui/admin-panel.js`**:
+   - Add "Stage Configuration" section:
+     - Slider: "Number of On-Screen Slots" (range: 2-10, default: 5)
+     - Live preview of slot count change
+     - Visual diagram of current slot layout:
+       ```
+       [OFF] [OFF] [S1] [S2] [S3] [S4] [S5]
+       ```
+   - Add per-player controls in the player list:
+     - Current slot indicator (e.g., "Slot 3 - Center" or "Off-Screen")
+     - ◄ Left / Right ► buttons to move that puppet
+     - Dropdown to jump to any specific slot
+   - Update existing "Move off-stage" button to move puppet to `offscreen-left` slot
+   - Update existing "Force move" dropdown to use slot names instead of coordinate-based locations
+
+3. **Visual stage overview** in admin panel:
+   - Mini-map showing all 7 slots
+   - Puppet avatars/nicknames displayed at their current slots
+   - Multiple puppets at same slot shown stacked with Z-offset indicator
+   - Off-screen slots shown in muted/dimmed style
+
+4. **Socket events** (add to `shared/protocols.js`):
+   - `admin-set-slot-count` (client → server): `{ count }`
+   - `admin-move-direction` (client → server): `{ targetPlayerId, direction }`
+   - `admin-move-to-slot` (client → server): `{ targetPlayerId, slotIndex }`
+
+### Deliverables
+
+- Admin stage configuration section with slot count slider
+- Per-player movement controls (left/right buttons + slot dropdown)
+- Visual stage overview mini-map
+- Updated admin socket events
+- Server-side admin methods for slot management
+
+### Acceptance Criteria
+
+- [ ] Admin can change number of on-screen slots (2-10)
+- [ ] Slot count change is broadcast to all clients immediately
+- [ ] Admin can move any puppet left or right with buttons
+- [ ] Admin can jump any puppet to a specific slot via dropdown
+- [ ] Visual mini-map shows all puppets at their current slots
+- [ ] Multiple puppets at same slot are shown stacked
+- [ ] Off-screen puppets are clearly indicated in mini-map
+- [ ] Existing "Move off-stage" button updated to use slot system
+- [ ] All admin actions trigger smooth animated transitions
+
+---
+
+## Request 21: Movement Synchronization & State Updates
+
+**Priority:** P1 - Core
+**Dependencies:** Request 18, Request 19
+
+### Description
+
+Synchronize slot-based puppet movement across all connected clients. Ensure all clients see the same puppet positions, transitions, and facing directions in real-time.
+
+### Requirements
+
+1. **Update `server/game-state.js`**:
+   - Replace `position: { x, y, z }` in player state with `slotIndex: number`
+   - Add `facingDirection: 'left' | 'right'` to player state
+   - Add `isTransitioning: boolean` to player state
+   - On `move-direction` event:
+     - Validate player is not already transitioning
+     - Calculate new slot index with wrap-around
+     - Update player state
+     - Broadcast `slot-moved` to all clients
+   - On `stage-config-update` (slot count change):
+     - Recalculate all slot positions
+     - If a puppet's slotIndex exceeds new total, clamp to max
+     - Broadcast new config and all updated positions
+
+2. **Update `client/js/app-state.js`**:
+   - Mirror server slot-based state
+   - Handle `slot-moved` events: update target puppet's slot index and trigger transition
+   - Handle `stage-config-update` events: recalculate local slot positions
+   - Send smooth position updates to local puppet renderer
+
+3. **Update `client/js/socket-client.js`**:
+   - Emit `move-direction` with `{ direction: 'left' | 'right' }`
+   - Listen for `slot-moved` and `stage-config-update` events
+
+4. **Transition synchronization**:
+   - Server sends `fromIndex`, `toIndex`, `timestamp` in `slot-moved` event
+   - Client calculates transition start time based on server timestamp + latency estimate
+   - All clients animate transition approximately simultaneously
+   - If client falls behind, snap to current slot position
+
+5. **State sync on connect**:
+   - Include `slotIndex`, `facingDirection`, `onScreenSlotCount` in initial `state-sync`
+   - New clients receive slot-based positions instead of coordinates
+
+### Deliverables
+
+- Server-side slot-based state management
+- Client-side slot state mirroring
+- Synchronized movement transitions across all clients
+- Updated state sync for new connections
+- Latency-compensated transition timing
+
+### Acceptance Criteria
+
+- [ ] All clients see puppet movement simultaneously (within 200ms)
+- [ ] Slot index is authoritative on server
+- [ ] Facing direction is synced to all clients
+- [ ] New clients receive correct slot positions on connect
+- [ ] Slot count changes are synced to all clients
+- [ ] Transition animations are roughly synchronized across clients
+- [ ] Disconnected-then-reconnected clients resync to correct slot
+- [ ] State delta updates only send changed slot indices
+
+---
+
+## Request 22: 2D Stage Polish & Visual Feedback
+
+**Priority:** P3 - Polish
+**Dependencies:** All previous requests in Phase 2
+
+### Description
+
+Add visual polish and feedback elements to the 2D multi-location stage system. This includes stage slot indicators, movement trail effects, location labels, and a cohesive 2D theater aesthetic.
+
+### Requirements
+
+1. **Stage slot indicators** in `client/js/three/stage.js`:
+   - Render subtle vertical markers at each on-screen slot position
+   - Each marker includes:
+     - A numbered label (1, 2, 3, 4, 5) displayed above the slot
+     - A small glowing dot on the stage floor at the slot position
+   - Occupied slots show a colored highlight (matching the puppet owner's color)
+   - Off-screen slots are not visually rendered (they're off-screen by definition)
+
+2. **Movement trail effect** in `client/js/puppet/puppet.js`:
+   - During wiggling transition, render a fading ghost trail behind the puppet
+   - Trail uses semi-transparent copies of the puppet silhouette
+   - Trail fades out over ~200ms after the puppet passes
+
+3. **Location label display** in `client/js/ui/ui-manager.js`:
+   - Show current location name above each puppet (e.g., "Slot 3", "Off-Screen")
+   - Labels are small, non-intrusive, and only visible when admin has "labels" enabled
+   - Add toggle in settings panel: "Show Location Labels"
+
+4. **2D Theater aesthetic**:
+   - Update stage backdrop to support a curtain-style design
+   - Add optional decorative side pillars at the stage edges
+   - Stage floor has a subtle texture or gradient
+   - Update `client/css/main.css` for a cohesive 2D theater theme
+
+5. **Settings panel update** in `client/js/ui/settings-panel.js`:
+   - Add "Transition Speed" slider (fast/normal/slow)
+   - Add "Wiggle Intensity" slider (none/low/medium/high)
+   - Add "Show Slot Markers" toggle
+   - Add "Show Location Labels" toggle
+   - Add "Auto-Play Walk Animation" toggle
+
+6. **Puppet panel update** in `client/js/ui/puppet-panel.js`:
+   - Update puppet preview to show in 2D side view (consistent with stage)
+   - Display Z-depth layer info in puppet details
+
+### Deliverables
+
+- Visual slot markers with numbers and occupancy indicators
+- Movement ghost trail effect
+- Configurable location labels above puppets
+- 2D theater aesthetic (curtains, pillars, textured floor)
+- Settings panel with transition/wiggle/label controls
+- Updated puppet panel for 2D preview
+
+### Acceptance Criteria
+
+- [ ] Slot markers are visible at each on-screen position
+- [ ] Slot markers show occupancy color when a puppet is present
+- [ ] Movement trail effect renders during transitions
+- [ ] Location labels can be toggled on/off
+- [ ] Stage has a cohesive 2D theater aesthetic
+- [ ] Transition speed is adjustable in settings
+- [ ] Wiggle intensity is adjustable in settings
+- [ ] Slot markers can be toggled on/off
+- [ ] Auto-play walk animation can be toggled on/off
+- [ ] Puppet panel preview matches 2D side view
+
+---
+
+## Implementation Order Summary (Phase 2)
+
+| Order | Request | Priority | Estimated Complexity |
+|-------|---------|----------|----------------------|
+| 15 | Orthographic 2D Camera & Side-View Stage | P0 | Medium |
+| 16 | Z-Axis Layering System for Puppet Parts | P0 | Medium |
+| 17 | Puppet Editor Z-Depth Control | P1 | Medium |
+| 18 | Stage Location System (7 Position Slots) | P0 | High |
+| 19 | Puppet Movement Controls & Smooth Transitions | P1 | High |
+| 20 | Admin Panel - Location Management & Puppet Controls | P2 | Medium |
+| 21 | Movement Synchronization & State Updates | P1 | Medium |
+| 22 | 2D Stage Polish & Visual Feedback | P3 | Medium |
+
+---
+
+## New Socket Events Reference (Phase 2)
+
+Add these to `shared/protocols.js`:
+
+```javascript
+// Client -> Server (Phase 2 additions)
+const CLIENT_EVENTS_PHASE2 = {
+  MOVE_DIRECTION: 'move-direction',
+  ADMIN_SET_SLOT_COUNT: 'admin-set-slot-count',
+  ADMIN_MOVE_DIRECTION: 'admin-move-direction',
+  ADMIN_MOVE_TO_SLOT: 'admin-move-to-slot',
+};
+
+// Server -> Client (Phase 2 additions)
+const SERVER_EVENTS_PHASE2 = {
+  SLOT_MOVED: 'slot-moved',
+  STAGE_CONFIG_UPDATE: 'stage-config-update',
+};
+```
+
+---
+
+## Updated Player State Format (Phase 2)
+
+```javascript
+{
+  playerId: 'socket-id',
+  nickname: 'PlayerName',
+  role: 'owner' | 'client',
+  puppetId: 'puppet-config-id',
+  slotIndex: 3,               // Current slot in cycle (0 to total-1)
+  facingDirection: 'right',   // 'left' or 'right'
+  isTransitioning: false,     // True during movement animation
+  currentAnimation: 'idle',   // Current animation name
+  animationTime: 0,
+  isLocked: false,
+  isOffScreen: false          // Derived from slotIndex
+}
+```
+
+---
+
+## Updated Stage Configuration Format
+
+```javascript
+{
+  onScreenSlotCount: 5,       // Number of on-screen slots (2-10)
+  totalSlots: 7,              // onScreenSlotCount + 2 off-screen
+  slotWidth: 0,               // Auto-calculated from viewport
+  stageWidth: 0,              // Auto-calculated from viewport
+  stageHeight: 0,             // Auto-calculated from viewport
+  slots: [                    // Calculated slot positions
+    { id: 'offscreen-far-left', index: 0, x: -999, y: 0, isOffScreen: true },
+    { id: 'offscreen-left', index: 1, x: -888, y: 0, isOffScreen: true },
+    { id: 'slot-0', index: 2, x: -300, y: 0, isOffScreen: false },
+    { id: 'slot-1', index: 3, x: -150, y: 0, isOffScreen: false },
+    { id: 'slot-2', index: 4, x: 0, y: 0, isOffScreen: false },
+    { id: 'slot-3', index: 5, x: 150, y: 0, isOffScreen: false },
+    { id: 'slot-4', index: 6, x: 300, y: 0, isOffScreen: false }
+  ]
+}
+```

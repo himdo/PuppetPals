@@ -5,6 +5,7 @@
 import SocketEvents from '../shared/protocols.js';
 import AssetManager from './asset-manager.js';
 import AnimationSync from './animation-sync.js';
+import GameState from './game-state.js';
 
 class SocketHandler {
   /**
@@ -17,6 +18,7 @@ class SocketHandler {
     this.authManager = authManager;
     this.assetManager = assetManager || new AssetManager();
     this.animationSync = new AnimationSync();
+    this.gameState = new GameState();
     /** @type {Map<string, Object>} Store of custom animations keyed by animation id */
     this.customAnimations = new Map();
   }
@@ -83,6 +85,11 @@ class SocketHandler {
 
       socket.on(SocketEvents.LIST_ANIMATIONS, (data) => {
         this.handleListAnimations(socket, data);
+      });
+
+      // ---- Game State / Movement Events ----
+      socket.on(SocketEvents.MOVE_PUPPET, (data) => {
+        this.handleMovePuppet(socket, data);
       });
     });
   }
@@ -338,6 +345,97 @@ class SocketHandler {
     });
 
     console.log(`[SocketHandler] ADMIN ${player.nickname} forced stop animation on ${puppetId}`);
+  }
+
+  // ============================================================
+  // Game State / Movement Handlers
+  // ============================================================
+
+  /**
+   * Handle move-puppet request from authenticated user
+   * @param {import('socket.io').Socket} socket
+   * @param {{ puppetId: string, location?: string, x?: number, z?: number }} data
+   */
+  handleMovePuppet(socket, data) {
+    const { puppetId, location, x, z } = data || {};
+
+    // Check authentication
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit('movement-error', {
+        message: 'You must be authenticated to move a puppet.',
+      });
+      return;
+    }
+
+    if (!puppetId) {
+      socket.emit('movement-error', {
+        message: 'puppetId is required.',
+      });
+      return;
+    }
+
+    // Register player in game state if not already registered
+    const existingState = this.gameState.getPlayerState(player.sessionId);
+    if (!existingState) {
+      this.gameState.registerPlayer(player.sessionId, puppetId, player.nickname);
+    }
+
+    // Check if puppet is locked
+    const playerState = this.gameState.getPlayerState(player.sessionId);
+    if (playerState && playerState.isLocked) {
+      socket.emit('movement-error', {
+        message: 'Your puppet has been locked by the server owner.',
+      });
+      return;
+    }
+
+    let newPosition;
+
+    if (location) {
+      // Move to predefined stage location
+      const success = this.gameState.movePlayer(player.sessionId, location);
+      if (!success) {
+        socket.emit('movement-error', {
+          message: `Invalid stage location: ${location}`,
+        });
+        return;
+      }
+    } else if (x !== undefined && z !== undefined) {
+      // Move to exact coordinates
+      const success = this.gameState.movePlayerTo(player.sessionId, x, z);
+      if (!success) {
+        socket.emit('movement-error', {
+          message: 'Failed to move player.',
+        });
+        return;
+      }
+    } else {
+      socket.emit('movement-error', {
+        message: 'Either location or (x, z) coordinates are required.',
+      });
+      return;
+    }
+
+    // Get the updated position
+    const updatedState = this.gameState.getPlayerState(player.sessionId);
+    newPosition = updatedState ? updatedState.position : { x: 0, y: 0, z: 0 };
+
+    // Broadcast movement to all clients
+    this.io.emit(SocketEvents.PUPPET_MOVED, {
+      playerId: player.sessionId,
+      puppetId,
+      position: newPosition,
+    });
+
+    // Also send as a state update
+    this.io.emit(SocketEvents.STATE_UPDATE, {
+      playerId: player.sessionId,
+      puppetId,
+      position: newPosition,
+    });
+
+    console.log(`[SocketHandler] ${player.nickname} moved ${puppetId} to (${newPosition.x}, ${newPosition.z})`);
   }
 
   // ============================================================

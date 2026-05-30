@@ -1,11 +1,12 @@
 /** Three.js Stage Module
- * Renderable stage/ground plane, grid helper, boundary markers, and background
+ * 2D stage floor, backdrop, and location slot markers for side-view theater
  */
 
 import * as THREE from 'three';
 
 /**
- * Stage class that creates the 3D stage environment
+ * Stage class that creates the 2D stage environment
+ * Replaces 3D ground plane with 2D floor, backdrop, and slot markers
  */
 class Stage {
   /**
@@ -13,117 +14,96 @@ class Stage {
    * @param {THREE.Scene} scene - The scene to add stage elements to
    * @param {Object} options - Stage configuration options
    * @param {number} options.width - Stage width (default: 20)
-   * @param {number} options.depth - Stage depth (default: 20)
+   * @param {number} options.onScreenSlotCount - Number of on-screen slot markers (default: 5)
    */
   constructor(scene, options = {}) {
     this.scene = scene;
     this.stageWidth = options.width || 20;
-    this.stageDepth = options.depth || 20;
+    this.onScreenSlotCount = options.onScreenSlotCount || 5;
     this.stageObjects = [];
   }
 
   /**
-   * Create the ground plane for the stage
-   * @returns {THREE.Mesh} The ground plane mesh
+   * Create the 2D stage floor (horizontal bar at bottom)
+   * @returns {THREE.Mesh} The stage floor mesh
    */
-  createGroundPlane() {
-    const geometry = new THREE.PlaneGeometry(this.stageWidth, this.stageDepth);
-    const material = new THREE.MeshLambertMaterial({ color: 0x2d2d5e });
-    const ground = new THREE.Mesh(geometry, material);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.01;
-    ground.name = 'groundPlane';
-    this.scene.add(ground);
-    this.stageObjects.push(ground);
-    return ground;
+  createStageFloor() {
+    const geometry = new THREE.PlaneGeometry(this.stageWidth, 0.5);
+    const material = new THREE.MeshBasicMaterial({ color: 0x2d2d5e });
+    const floor = new THREE.Mesh(geometry, material);
+    floor.position.y = -4.5;
+    floor.name = 'stageFloor';
+    this.scene.add(floor);
+    this.stageObjects.push(floor);
+    return floor;
   }
 
   /**
-   * Create a grid helper for visual reference
-   * @returns {THREE.GridHelper} The grid helper
+   * Create a backdrop plane at z: -1 as the background layer
+   * @returns {THREE.Mesh} The backdrop plane mesh
    */
-  createGridHelper() {
-    const grid = new THREE.GridHelper(
-      this.stageWidth,
-      20,
-      0x888888,
-      0x444444
-    );
-    grid.name = 'gridHelper';
-    this.scene.add(grid);
-    this.stageObjects.push(grid);
-    return grid;
+  createBackdrop() {
+    const geometry = new THREE.PlaneGeometry(this.stageWidth + 10, 15);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x1a1a2e,
+      side: THREE.DoubleSide,
+    });
+    const backdrop = new THREE.Mesh(geometry, material);
+    backdrop.position.set(0, 0, -1);
+    backdrop.name = 'stageBackdrop';
+    this.scene.add(backdrop);
+    this.stageObjects.push(backdrop);
+    return backdrop;
   }
 
   /**
-   * Create boundary markers at the four corners of the stage
-   * @returns {THREE.Mesh[]} Array of 4 boundary marker meshes
+   * Create location slot markers at each on-screen position
+   * These are subtle vertical lines/icons marking where puppets can stand
+   * @returns {THREE.Mesh[]} Array of slot marker meshes
    */
-  createBoundaryMarkers() {
+  createSlotMarkers() {
     const markers = [];
-    const halfWidth = this.stageWidth / 2;
-    const halfDepth = this.stageDepth / 2;
-    const markerSize = 0.2;
+    const slotWidth = this.stageWidth / this.onScreenSlotCount;
 
-    const corners = [
-      { x: -halfWidth, z: -halfDepth },
-      { x: halfWidth, z: -halfDepth },
-      { x: -halfWidth, z: halfDepth },
-      { x: halfWidth, z: halfDepth },
-    ];
+    for (let i = 0; i < this.onScreenSlotCount; i++) {
+      const x = -this.stageWidth / 2 + slotWidth * (i + 0.5);
 
-    corners.forEach((corner, i) => {
-      const geometry = new THREE.PlaneGeometry(markerSize, markerSize);
-      const material = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+      const geometry = new THREE.PlaneGeometry(0.3, 0.3);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x44aaff,
+        transparent: true,
+        opacity: 0.6,
+      });
       const marker = new THREE.Mesh(geometry, material);
-      marker.rotation.x = -Math.PI / 2;
-      marker.position.set(corner.x, 0.01, corner.z);
-      marker.name = `boundaryMarker_${i}`;
+      marker.position.set(x, -4.2, 0);
+      marker.name = `slotMarker_${i}`;
       this.scene.add(marker);
       this.stageObjects.push(marker);
       markers.push(marker);
-    });
+    }
 
     return markers;
   }
 
   /**
-   * Create a background plane behind the stage
-   * @returns {THREE.Mesh} The background plane mesh
-   */
-  createBackgroundPlane() {
-    const geometry = new THREE.PlaneGeometry(30, 15);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x1a1a2e,
-      side: THREE.DoubleSide,
-    });
-    const bg = new THREE.Mesh(geometry, material);
-    bg.position.set(0, 5, -10);
-    bg.name = 'backgroundPlane';
-    this.scene.add(bg);
-    this.stageObjects.push(bg);
-    return bg;
-  }
-
-  /**
-   * Setup the full stage with all elements (ground, grid, markers, background)
+   * Setup the full 2D stage with floor, backdrop, and slot markers
+   * Does NOT create grid helper or boundary markers (not needed for 2D view)
    */
   setupStage() {
-    this.createGroundPlane();
-    this.createGridHelper();
-    this.createBoundaryMarkers();
-    this.createBackgroundPlane();
+    this.createStageFloor();
+    this.createBackdrop();
+    this.createSlotMarkers();
   }
 
   /**
-   * Set a texture on the background plane
+   * Set a texture on the backdrop plane
    * @param {THREE.Texture} texture - The texture to apply
    */
   setBackgroundTexture(texture) {
-    const bg = this.scene.getObjectByName('backgroundPlane');
-    if (bg) {
-      bg.material.map = texture;
-      bg.material.needsUpdate = true;
+    const backdrop = this.scene.getObjectByName('stageBackdrop');
+    if (backdrop) {
+      backdrop.material.map = texture;
+      backdrop.material.needsUpdate = true;
     }
   }
 

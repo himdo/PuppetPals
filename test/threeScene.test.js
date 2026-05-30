@@ -1,6 +1,7 @@
 /** Unit Tests for Three.js 3D Scene Setup
  * Tests renderer, scene, camera, lighting, and stage modules
  * Uses mocked Three.js for Node.js test environment via __mocks__/three.js
+ * Updated for Request 15: Orthographic 2D Camera & Side-View Stage
  */
 
 // Mock window globals needed by Camera module
@@ -88,6 +89,12 @@ describe('Three.js Renderer Module', () => {
     expect(renderer.renderer.setSizeArgs).toEqual({ width: 1920, height: 1080 });
     expect(result).toBe(renderer.renderer);
   });
+
+  it('should set sortObjects to true on init for 2D rendering', () => {
+    const renderer = new Renderer(canvas);
+    renderer.init(800, 600);
+    expect(renderer.renderer.sortObjects).toBe(true);
+  });
 });
 
 describe('Three.js Scene Module', () => {
@@ -145,7 +152,7 @@ describe('Three.js Scene Module', () => {
   });
 });
 
-describe('Three.js Camera Module', () => {
+describe('Three.js Camera Module (Orthographic 2D)', () => {
   let canvas;
 
   beforeEach(() => {
@@ -158,72 +165,41 @@ describe('Three.js Camera Module', () => {
     expect(camera.camera).toBeTruthy();
   });
 
-  it('should set default camera position', () => {
+  it('should use OrthographicCamera', () => {
+    const camera = new Camera(canvas);
+    expect(camera.camera.constructor.name).toBe('MockOrthographicCamera');
+  });
+
+  it('should set camera position at (0, 0, 10) for side view', () => {
     const camera = new Camera(canvas);
     expect(camera.camera.position.x).toBe(0);
-    expect(camera.camera.position.y).toBe(5);
+    expect(camera.camera.position.y).toBe(0);
     expect(camera.camera.position.z).toBe(10);
   });
 
-  it('should enable orbit controls damping', () => {
+  it('should not have orbit controls (fixed 2D camera)', () => {
     const camera = new Camera(canvas);
-    expect(camera.controls.enableDamping).toBe(true);
+    expect(camera.controls).toBeNull();
   });
 
-  it('should set controls target to origin', () => {
+  it('should configure frustum based on viewport', () => {
     const camera = new Camera(canvas);
-    expect(camera.controls.target.x).toBe(0);
-    expect(camera.controls.target.y).toBe(0);
-    expect(camera.controls.target.z).toBe(0);
+    expect(camera.camera.left).toBe(-400);
+    expect(camera.camera.right).toBe(400);
+    expect(camera.camera.top).toBe(300);
+    expect(camera.camera.bottom).toBe(-300);
   });
 
-  it('should apply default preset', () => {
-    const camera = new Camera(canvas);
-    // Move camera away first
-    camera.camera.position.set(100, 100, 100);
-    const result = camera.setPreset('default');
-    expect(result).toBe(true);
-    expect(camera.camera.position.x).toBe(0);
-    expect(camera.camera.position.y).toBe(5);
-    expect(camera.camera.position.z).toBe(10);
-  });
-
-  it('should apply topDown preset', () => {
-    const camera = new Camera(canvas);
-    camera.setPreset('topDown');
-    expect(camera.camera.position.x).toBe(0);
-    expect(camera.camera.position.y).toBe(15);
-    expect(camera.camera.position.z).toBe(0.01);
-  });
-
-  it('should apply side preset', () => {
-    const camera = new Camera(canvas);
-    camera.setPreset('side');
-    expect(camera.camera.position.x).toBe(10);
-    expect(camera.camera.position.y).toBe(3);
-    expect(camera.camera.position.z).toBe(0);
-  });
-
-  it('should return false for invalid preset', () => {
-    const camera = new Camera(canvas);
-    const result = camera.setPreset('invalidPreset');
-    expect(result).toBe(false);
-  });
-
-  it('should update aspect ratio on resize', () => {
-    const camera = new Camera(canvas);
-    camera.handleResize(1024, 768);
-    expect(camera.camera.aspect).toBe(1024 / 768);
-  });
-
-  it('should update width and height on resize', () => {
+  it('should update frustum on resize', () => {
     const camera = new Camera(canvas);
     camera.handleResize(1920, 1080);
     expect(camera.width).toBe(1920);
     expect(camera.height).toBe(1080);
+    expect(camera.camera.left).toBe(-960);
+    expect(camera.camera.right).toBe(960);
   });
 
-  it('should have update method for controls', () => {
+  it('should have update method (no-op for fixed camera)', () => {
     const camera = new Camera(canvas);
     expect(typeof camera.update).toBe('function');
     camera.update(); // should not throw
@@ -235,18 +211,29 @@ describe('Three.js Camera Module', () => {
     camera.dispose(); // should not throw
   });
 
-  it('should have three presets defined', () => {
-    const camera = new Camera(canvas);
-    expect(Object.keys(camera.presets)).toEqual(expect.arrayContaining(['default', 'topDown', 'side']));
-  });
-
   it('should provide getCamera method', () => {
     const camera = new Camera(canvas);
     expect(camera.getCamera()).toBe(camera.camera);
   });
+
+  it('should support zoomIn', () => {
+    const camera = new Camera(canvas);
+    const initialWidth = camera.camera.right - camera.camera.left;
+    camera.zoomIn();
+    const zoomedWidth = camera.camera.right - camera.camera.left;
+    expect(zoomedWidth).toBeLessThan(initialWidth);
+  });
+
+  it('should support zoomOut', () => {
+    const camera = new Camera(canvas);
+    const initialWidth = camera.camera.right - camera.camera.left;
+    camera.zoomOut();
+    const zoomedWidth = camera.camera.right - camera.camera.left;
+    expect(zoomedWidth).toBeGreaterThan(initialWidth);
+  });
 });
 
-describe('Three.js Lighting Module', () => {
+describe('Three.js Lighting Module (2D Simplified)', () => {
   let mockScene;
   let lighting;
 
@@ -267,37 +254,23 @@ describe('Three.js Lighting Module', () => {
     expect(lighting.lightCount).toBe(0);
   });
 
-  it('should setup basic lighting with ambient and directional', () => {
-    const { ambient, directional } = lighting.setupBasicLighting();
+  it('should setup 2D lighting with only ambient light', () => {
+    const ambient = lighting.setupBasicLighting();
     expect(ambient).toBeTruthy();
-    expect(directional).toBeTruthy();
-    expect(lighting.lightCount).toBe(2);
-  });
-
-  it('should add lights to the scene', () => {
-    lighting.setupBasicLighting();
-    expect(mockScene.add).toHaveBeenCalledTimes(2);
-    expect(mockScene.children.length).toBe(2);
-  });
-
-  it('should add point light', () => {
-    const point = lighting.addPointLight(1, 2, 3, 0xff0000, 0.5, 10);
-    expect(point).toBeTruthy();
-    expect(point.position.x).toBe(1);
-    expect(point.position.y).toBe(2);
-    expect(point.position.z).toBe(3);
+    expect(ambient.constructor.name).toBe('MockAmbientLight');
+    expect(ambient.intensity).toBe(1.0);
     expect(lighting.lightCount).toBe(1);
   });
 
-  it('should use default values for point light params', () => {
-    const point = lighting.addPointLight(0, 0, 0);
-    expect(point).toBeTruthy();
+  it('should add light to the scene', () => {
+    lighting.setupBasicLighting();
+    expect(mockScene.add).toHaveBeenCalledTimes(1);
+    expect(mockScene.children.length).toBe(1);
   });
 
   it('should remove all lights', () => {
     lighting.setupBasicLighting();
-    lighting.addPointLight(0, 0, 0);
-    expect(lighting.lightCount).toBe(3);
+    expect(lighting.lightCount).toBe(1);
     lighting.removeAllLights();
     expect(lighting.lightCount).toBe(0);
   });
@@ -305,30 +278,19 @@ describe('Three.js Lighting Module', () => {
   it('should call scene.remove for each light on removeAllLights', () => {
     lighting.setupBasicLighting();
     lighting.removeAllLights();
-    expect(mockScene.remove).toHaveBeenCalledTimes(2);
+    expect(mockScene.remove).toHaveBeenCalledTimes(1);
   });
 
-  it('should set directional light position', () => {
-    const { directional } = lighting.setupBasicLighting();
-    expect(directional.position.x).toBe(5);
-    expect(directional.position.y).toBe(10);
-    expect(directional.position.z).toBe(7);
-  });
-
-  it('should return correct lightCount after multiple operations', () => {
+  it('should return correct lightCount after operations', () => {
     expect(lighting.lightCount).toBe(0);
     lighting.setupBasicLighting();
-    expect(lighting.lightCount).toBe(2);
-    lighting.addPointLight(0, 0, 0);
-    expect(lighting.lightCount).toBe(3);
-    lighting.addPointLight(1, 1, 1);
-    expect(lighting.lightCount).toBe(4);
+    expect(lighting.lightCount).toBe(1);
     lighting.removeAllLights();
     expect(lighting.lightCount).toBe(0);
   });
 });
 
-describe('Three.js Stage Module', () => {
+describe('Three.js Stage Module (2D Theater)', () => {
   let mockScene;
   let stage;
 
@@ -348,89 +310,71 @@ describe('Three.js Stage Module', () => {
   it('should create a stage instance', () => {
     expect(stage).toBeTruthy();
     expect(stage.stageWidth).toBe(20);
-    expect(stage.stageDepth).toBe(20);
   });
 
-  it('should accept custom width and depth options', () => {
-    const customStage = new Stage(mockScene, { width: 30, depth: 40 });
+  it('should accept custom width options', () => {
+    const customStage = new Stage(mockScene, { width: 30 });
     expect(customStage.stageWidth).toBe(30);
-    expect(customStage.stageDepth).toBe(40);
   });
 
   it('should start with zero stage objects', () => {
     expect(stage.stageObjectCount).toBe(0);
   });
 
-  it('should create ground plane', () => {
-    const ground = stage.createGroundPlane();
-    expect(ground).toBeTruthy();
-    expect(ground.name).toBe('groundPlane');
-    expect(ground.rotation.x).toBe(-Math.PI / 2);
-    expect(ground.position.y).toBe(-0.01);
+  it('should create stage floor', () => {
+    const floor = stage.createStageFloor();
+    expect(floor).toBeTruthy();
+    expect(floor.name).toBe('stageFloor');
+    expect(floor.position.y).toBe(-4.5);
   });
 
-  it('should add ground plane to scene', () => {
-    stage.createGroundPlane();
+  it('should add stage floor to scene', () => {
+    stage.createStageFloor();
     expect(mockScene.add).toHaveBeenCalledTimes(1);
     expect(stage.stageObjectCount).toBe(1);
   });
 
-  it('should create grid helper', () => {
-    const grid = stage.createGridHelper();
-    expect(grid).toBeTruthy();
-    expect(grid.size).toBe(20);
-    expect(grid.divisions).toBe(20);
+  it('should create backdrop at z: -1', () => {
+    const backdrop = stage.createBackdrop();
+    expect(backdrop).toBeTruthy();
+    expect(backdrop.name).toBe('stageBackdrop');
+    expect(backdrop.position.z).toBe(-1);
   });
 
-  it('should add grid helper to scene', () => {
-    stage.createGridHelper();
+  it('should add backdrop to scene', () => {
+    stage.createBackdrop();
     expect(stage.stageObjectCount).toBe(1);
   });
 
-  it('should create 4 boundary markers', () => {
-    const markers = stage.createBoundaryMarkers();
-    expect(markers.length).toBe(4);
-    expect(stage.stageObjectCount).toBe(4);
+  it('should create 5 slot markers by default', () => {
+    const markers = stage.createSlotMarkers();
+    expect(markers.length).toBe(5);
+    expect(stage.stageObjectCount).toBe(5);
   });
 
-  it('should position boundary markers at corners', () => {
-    const markers = stage.createBoundaryMarkers();
-    // Stage is 20x20, so half is 10
-    expect(markers[0].position.x).toBe(-10);
-    expect(markers[0].position.z).toBe(-10);
-    expect(markers[1].position.x).toBe(10);
-    expect(markers[1].position.z).toBe(-10);
-    expect(markers[2].position.x).toBe(-10);
-    expect(markers[2].position.z).toBe(10);
-    expect(markers[3].position.x).toBe(10);
-    expect(markers[3].position.z).toBe(10);
+  it('should position slot markers across stage width', () => {
+    const markers = stage.createSlotMarkers();
+    // Stage is 20, 5 slots = 4 units per slot
+    // Positions: -8, -4, 0, 4, 8
+    expect(markers[0].position.x).toBe(-8);
+    expect(markers[1].position.x).toBe(-4);
+    expect(markers[2].position.x).toBe(0);
+    expect(markers[3].position.x).toBe(4);
+    expect(markers[4].position.x).toBe(8);
   });
 
-  it('should name boundary markers sequentially', () => {
-    const markers = stage.createBoundaryMarkers();
-    expect(markers[0].name).toBe('boundaryMarker_0');
-    expect(markers[1].name).toBe('boundaryMarker_1');
-    expect(markers[2].name).toBe('boundaryMarker_2');
-    expect(markers[3].name).toBe('boundaryMarker_3');
+  it('should name slot markers sequentially', () => {
+    const markers = stage.createSlotMarkers();
+    expect(markers[0].name).toBe('slotMarker_0');
+    expect(markers[1].name).toBe('slotMarker_1');
+    expect(markers[2].name).toBe('slotMarker_2');
+    expect(markers[3].name).toBe('slotMarker_3');
+    expect(markers[4].name).toBe('slotMarker_4');
   });
 
-  it('should create background plane', () => {
-    const bg = stage.createBackgroundPlane();
-    expect(bg).toBeTruthy();
-    expect(bg.name).toBe('backgroundPlane');
-    expect(bg.position.z).toBe(-10);
-  });
-
-  it('should position background plane at (0, 5, -10)', () => {
-    const bg = stage.createBackgroundPlane();
-    expect(bg.position.x).toBe(0);
-    expect(bg.position.y).toBe(5);
-    expect(bg.position.z).toBe(-10);
-  });
-
-  it('should setup full stage with all elements', () => {
+  it('should setup full 2D stage with all elements', () => {
     stage.setupStage();
-    // 1 ground + 1 grid + 4 markers + 1 background = 7
+    // 1 floor + 1 backdrop + 5 slot markers = 7
     expect(stage.stageObjectCount).toBe(7);
   });
 
@@ -447,46 +391,44 @@ describe('Three.js Stage Module', () => {
     expect(mockScene.remove).toHaveBeenCalledTimes(7);
   });
 
-  it('should set background texture', () => {
+  it('should set backdrop texture', () => {
     stage.setupStage();
     const mockTexture = { url: 'test-bg.png' };
     stage.setBackgroundTexture(mockTexture);
-    const bg = mockScene.getObjectByName('backgroundPlane');
-    expect(bg.material.map).toBe(mockTexture);
-    expect(bg.material.needsUpdate).toBe(true);
+    const backdrop = mockScene.getObjectByName('stageBackdrop');
+    expect(backdrop.material.map).toBe(mockTexture);
+    expect(backdrop.material.needsUpdate).toBe(true);
   });
 
-  it('should handle setBackgroundTexture when background does not exist', () => {
-    // Don't setup stage, so no background exists
+  it('should handle setBackgroundTexture when backdrop does not exist', () => {
+    // Don't setup stage, so no backdrop exists
     const mockTexture = { url: 'test-bg.png' };
     stage.setBackgroundTexture(mockTexture); // should not throw
   });
 
-  it('should use custom stage dimensions for ground plane', () => {
-    const customStage = new Stage(mockScene, { width: 30, depth: 40 });
-    const ground = customStage.createGroundPlane();
-    expect(ground.geometry.width).toBe(30);
-    expect(ground.geometry.height).toBe(40);
+  it('should use custom stage dimensions for floor', () => {
+    const customStage = new Stage(mockScene, { width: 30 });
+    const floor = customStage.createStageFloor();
+    expect(floor.geometry.width).toBe(30);
   });
 
-  it('should use custom stage dimensions for grid', () => {
-    const customStage = new Stage(mockScene, { width: 30, depth: 40 });
-    const grid = customStage.createGridHelper();
-    expect(grid.size).toBe(30);
+  it('should use custom onScreenSlotCount', () => {
+    const customStage = new Stage(mockScene, { onScreenSlotCount: 3 });
+    const markers = customStage.createSlotMarkers();
+    expect(markers.length).toBe(3);
   });
 
-  it('should position boundary markers based on custom dimensions', () => {
-    const customStage = new Stage(mockScene, { width: 30, depth: 40 });
-    const markers = customStage.createBoundaryMarkers();
-    // halfWidth = 15, halfDepth = 20
-    expect(markers[0].position.x).toBe(-15);
-    expect(markers[0].position.z).toBe(-20);
-    expect(markers[3].position.x).toBe(15);
-    expect(markers[3].position.z).toBe(20);
+  it('should position markers based on custom dimensions', () => {
+    const customStage = new Stage(mockScene, { width: 30, onScreenSlotCount: 6 });
+    const markers = customStage.createSlotMarkers();
+    // 6 slots across width 30: each slot is 5 units wide
+    // Positions at center of each slot: -12.5, -7.5, -2.5, 2.5, 7.5, 12.5
+    expect(markers[0].position.x).toBe(-12.5);
+    expect(markers[5].position.x).toBe(12.5);
   });
 });
 
-describe('Three.js Module Integration', () => {
+describe('Three.js Module Integration (2D)', () => {
   it('should verify all modules can work together', () => {
     // Simulate the init flow from main.js
     const canvas = { id: 'stage-canvas' };
@@ -502,18 +444,19 @@ describe('Three.js Module Integration', () => {
     stage.setupStage();
 
     expect(renderer.renderer.setSizeCalled).toBe(true);
-    expect(lighting.lightCount).toBe(2);
+    expect(renderer.renderer.sortObjects).toBe(true);
+    expect(lighting.lightCount).toBe(1);
     expect(stage.stageObjectCount).toBe(7);
-    expect(camera.camera.position.y).toBe(5);
+    expect(camera.camera.position.z).toBe(10);
+    expect(camera.controls).toBeNull();
   });
 
-  it('should verify camera preset constants', () => {
+  it('should verify camera is orthographic', () => {
     const canvas = { id: 'stage-canvas' };
     const camera = new Camera(canvas);
-    expect(Object.keys(camera.presets).length).toBe(3);
-    expect(camera.presets.default).toBeTruthy();
-    expect(camera.presets.topDown).toBeTruthy();
-    expect(camera.presets.side).toBeTruthy();
+    expect(camera.camera.constructor.name).toBe('MockOrthographicCamera');
+    expect(camera.camera.near).toBe(-100);
+    expect(camera.camera.far).toBe(100);
   });
 
   it('should verify stage dimensions constants', () => {
@@ -525,11 +468,11 @@ describe('Three.js Module Integration', () => {
     };
     const stage = new Stage(mockScene);
     expect(stage.stageWidth).toBe(20);
-    expect(stage.stageDepth).toBe(20);
+    expect(stage.onScreenSlotCount).toBe(5);
   });
 });
 
-describe('Three.js Render Loop Simulation', () => {
+describe('Three.js Render Loop Simulation (2D)', () => {
   it('should simulate a render loop structure', () => {
     let frameCount = 0;
     let isRunning = true;
@@ -589,13 +532,10 @@ describe('Three.js Render Loop Simulation', () => {
 
     // Verify resize was handled
     expect(renderer.renderer.setSizeArgs).toEqual({ width: newWidth, height: newHeight });
-    expect(camera.camera.aspect).toBe(newWidth / newHeight);
+    expect(camera.camera.left).toBe(-newWidth / 2);
+    expect(camera.camera.right).toBe(newWidth / 2);
     expect(camera.width).toBe(newWidth);
     expect(camera.height).toBe(newHeight);
-
-    // Simulate camera preset change
-    camera.setPreset('topDown');
-    expect(camera.camera.position.y).toBe(15);
 
     // Cleanup
     camera.dispose();

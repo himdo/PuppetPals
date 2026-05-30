@@ -1,11 +1,12 @@
 /** Three.js Lighting Module
- * Ambient and directional light setup for the 3D scene
+ * Simplified lighting for 2D: single ambient light for unlit sprite rendering
  */
 
 import * as THREE from 'three';
 
 /**
  * Lighting class that manages scene lights
+ * Optimized for 2D sprite rendering (no shading needed)
  */
 class Lighting {
   /**
@@ -18,40 +19,17 @@ class Lighting {
   }
 
   /**
-   * Setup basic lighting with ambient and directional lights
-   * @returns {Object} Object containing the created lights
+   * Setup simplified 2D lighting with only ambient light
+   * Directional and point lights are unneeded for unlit sprite rendering in 2D
+   * @returns {THREE.AmbientLight} The created ambient light
    */
   setupBasicLighting() {
-    // Ambient light for base illumination
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    // Single ambient light at full intensity for 2D sprite rendering
+    const ambient = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(ambient);
     this.lights.push(ambient);
 
-    // Directional light for shadows and depth
-    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
-    directional.position.set(5, 10, 7);
-    this.scene.add(directional);
-    this.lights.push(directional);
-
-    return { ambient, directional };
-  }
-
-  /**
-   * Add a point light to the scene for atmosphere
-   * @param {number} x - X position
-   * @param {number} y - Y position
-   * @param {number} z - Z position
-   * @param {number} color - Light color hex (default: 0xffffff)
-   * @param {number} intensity - Light intensity (default: 1)
-   * @param {number} distance - Light falloff distance (default: 0 = infinite)
-   * @returns {THREE.PointLight} The created point light
-   */
-  addPointLight(x, y, z, color = 0xffffff, intensity = 1, distance = 0) {
-    const point = new THREE.PointLight(color, intensity, distance);
-    point.position.set(x, y, z);
-    this.scene.add(point);
-    this.lights.push(point);
-    return point;
+    return ambient;
   }
 
   /**

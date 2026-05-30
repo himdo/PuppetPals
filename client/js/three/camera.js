@@ -1,107 +1,136 @@
 /** Three.js Camera Module
- * Perspective camera setup with orbit controls and presets
+ * Orthographic camera setup for 2D side-view theater rendering
  */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /**
- * Camera class with orbit controls and presets
+ * Camera class using OrthographicCamera for 2D side-view rendering
+ * Camera is fixed in side-on orientation with no rotation or zoom by default
+ * Optional zoom in/out buttons adjust the frustum uniformly
  */
 class Camera {
   /**
    * Create a new Camera instance
-   * @param {HTMLCanvasElement} canvas - The canvas element for orbit controls
+   * @param {HTMLCanvasElement} canvas - The canvas element (kept for API compatibility)
    */
   constructor(canvas) {
     this.canvas = canvas;
     this.width = window.innerWidth;
     this.height = window.innerHeight;
 
-    this.camera = new THREE.PerspectiveCamera(
-      60,
-      this.width / this.height,
-      0.1,
-      1000
-    );
-    this.camera.position.set(0, 5, 10);
+    // Calculate frustum based on viewport aspect ratio
+    const left = -this.width / 2;
+    const right = this.width / 2;
+    const top = this.height / 2;
+    const bottom = -this.height / 2;
 
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.target.set(0, 0, 0);
+    this.camera = new THREE.OrthographicCamera(left, right, top, bottom, -100, 100);
+    this.camera.position.set(0, 0, 10);
 
-    // Camera presets
-    this.presets = {
-      default: {
-        position: { x: 0, y: 5, z: 10 },
-        target: { x: 0, y: 0, z: 0 },
-      },
-      topDown: {
-        position: { x: 0, y: 15, z: 0.01 },
-        target: { x: 0, y: 0, z: 0 },
-      },
-      side: {
-        position: { x: 10, y: 3, z: 0 },
-        target: { x: 0, y: 0, z: 0 },
-      },
-    };
+    // No orbit controls - camera is fixed for 2D theater view
+    this.controls = null;
+
+    // Zoom limits
+    this.minFrustumWidth = 1;
+    this.maxFrustumWidth = 8000;
   }
 
   /**
    * Get the underlying Three.js camera
-   * @returns {THREE.PerspectiveCamera}
+   * @returns {THREE.OrthographicCamera}
    */
   getCamera() {
     return this.camera;
   }
 
   /**
-   * Apply a camera preset
-   * @param {string} presetName - Name of the preset ('default', 'topDown', 'side')
-   * @returns {boolean} True if preset was applied, false if not found
+   * Zoom in by reducing the frustum uniformly (divide by 2 = smaller view area)
    */
-  setPreset(presetName) {
-    const preset = this.presets[presetName];
-    if (!preset) return false;
+  zoomIn() {
+    const left = this.camera.left / 2;
+    const right = this.camera.right / 2;
+    const top = this.camera.top / 2;
+    const bottom = this.camera.bottom / 2;
 
-    this.camera.position.set(
-      preset.position.x,
-      preset.position.y,
-      preset.position.z
-    );
-    this.controls.target.set(
-      preset.target.x,
-      preset.target.y,
-      preset.target.z
-    );
-    return true;
+    // Clamp to minimum frustum size
+    const frustumWidth = right - left;
+    if (frustumWidth < this.minFrustumWidth) {
+      const scale = this.minFrustumWidth / (this.camera.right - this.camera.left);
+      this.camera.left *= scale;
+      this.camera.right *= scale;
+      this.camera.top *= scale;
+      this.camera.bottom *= scale;
+    } else {
+      this.camera.left = left;
+      this.camera.right = right;
+      this.camera.top = top;
+      this.camera.bottom = bottom;
+    }
+
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Zoom out by expanding the frustum uniformly (multiply by 2 = larger view area)
+   */
+  zoomOut() {
+    const left = this.camera.left * 2;
+    const right = this.camera.right * 2;
+    const top = this.camera.top * 2;
+    const bottom = this.camera.bottom * 2;
+
+    // Clamp to maximum frustum size
+    const frustumWidth = right - left;
+    if (frustumWidth > this.maxFrustumWidth) {
+      const scale = this.maxFrustumWidth / (this.camera.right - this.camera.left);
+      this.camera.left *= scale;
+      this.camera.right *= scale;
+      this.camera.top *= scale;
+      this.camera.bottom *= scale;
+    } else {
+      this.camera.left = left;
+      this.camera.right = right;
+      this.camera.top = top;
+      this.camera.bottom = bottom;
+    }
+
+    this.camera.updateProjectionMatrix();
   }
 
   /**
    * Handle window resize events
+   * Recalculates orthographic frustum to maintain proper aspect ratio
    * @param {number} width - New width
    * @param {number} height - New height
    */
   handleResize(width, height) {
     this.width = width;
     this.height = height;
-    this.camera.aspect = width / height;
+    this.camera.left = -width / 2;
+    this.camera.right = width / 2;
+    this.camera.top = height / 2;
+    this.camera.bottom = -height / 2;
     this.camera.updateProjectionMatrix();
   }
 
   /**
-   * Update the orbit controls (call each frame)
+   * Update method (no-op since there are no orbit controls)
+   * Kept for API compatibility with render loops
    */
   update() {
-    this.controls.update();
+    // No-op: no orbit controls to update
   }
 
   /**
-   * Dispose of controls and clean up resources
+   * Dispose of resources
+   * Handles null controls safely
    */
   dispose() {
-    this.controls.dispose();
+    // No controls to dispose since camera is fixed
+    if (this.controls) {
+      this.controls.dispose();
+    }
   }
 }
 

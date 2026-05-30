@@ -44,6 +44,8 @@ class Renderer {
     this.renderer.setSize(width, height);
     this.renderer.setClearColor(this.options.clearColor, this.options.clearAlpha);
     this.renderer.setPixelRatio(window.devicePixelRatio);
+    // Enable Z-order rendering for proper 2D sprite layering with alpha sorting
+    this.renderer.sortObjects = true;
     return this.renderer;
   }
 

@@ -74,12 +74,31 @@ class MockPerspectiveCamera extends MockObject3D {
   updateProjectionMatrix() {}
 }
 
+class MockOrthographicCamera extends MockObject3D {
+  constructor(left = -1, right = 1, top = 1, bottom = -1, near = -100, far = 100) {
+    super();
+    this.left = left;
+    this.right = right;
+    this.top = top;
+    this.bottom = bottom;
+    this.near = near;
+    this.far = far;
+  }
+  updateProjectionMatrix() {
+    this.projectionMatrixUpdated = true;
+  }
+  setZoom(zoom) {
+    this.zoom = zoom;
+  }
+}
+
 class MockWebGLRenderer {
   constructor(params = {}) {
     this.params = params;
     this.setSizeCalled = false;
     this.setSizeArgs = null;
     this.pixelRatio = 1;
+    this.sortObjects = false;
   }
   setSize(width, height) {
     this.setSizeCalled = true;
@@ -181,6 +200,7 @@ const DoubleSide = 2;
 const MockTHREE = {
   Scene: MockScene,
   PerspectiveCamera: MockPerspectiveCamera,
+  OrthographicCamera: MockOrthographicCamera,
   WebGLRenderer: MockWebGLRenderer,
   DirectionalLight: MockDirectionalLight,
   AmbientLight: MockAmbientLight,

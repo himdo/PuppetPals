@@ -1,6 +1,7 @@
 /** PuppetEditor - In-browser visual editor for puppet customization
  * Allows editing bone positions, rotations, scale, socket offsets,
  * and asset assignment. Supports undo/reset and JSON export.
+ * Extended with Z-depth control for 2D layering (Request 17).
  */
 
 import Skeleton from './skeleton.js';
@@ -24,6 +25,13 @@ class PuppetEditor {
 
     // Original state snapshot for undo/reset
     this.originalState = null;
+
+    // Selection order for manual Z-depth reordering
+    this.selectionOrder = [];
+
+    // Z-depth range constants
+    this.Z_DEPTH_MIN = -10;
+    this.Z_DEPTH_MAX = 10;
   }
 
   /**
@@ -292,13 +300,125 @@ class PuppetEditor {
   }
 
   // =====================
+  // Z-Depth Manipulation (Request 17)
+  // =====================
+
+  /**
+   * Set the Z-depth of the selected bone for 2D layer control
+   * Clamps value to range [-10, 10]
+   * @param {number} value - The Z-depth value (-10 to 10)
+   */
+  setBoneZDepth(value) {
+    const bone = this.getSelectedBone();
+    if (!bone) return;
+
+    // Validate: must be a number (Infinity/NaN handled by clamping)
+    if (typeof value !== 'number') return;
+    if (Number.isNaN(value)) return;
+
+    // Clamp to allowed range (Infinity will be clamped to max/min)
+    const clamped = Math.max(this.Z_DEPTH_MIN, Math.min(this.Z_DEPTH_MAX, value));
+    bone.zDepth = clamped;
+  }
+
+  /**
+   * Get the current Z-depth of the selected bone
+   * @returns {number|null} The Z-depth value, or null if no bone selected
+   */
+  getBoneZDepth() {
+    const bone = this.getSelectedBone();
+    if (!bone) return null;
+    return bone.zDepth;
+  }
+
+  // =====================
+  // Z-Depth Reordering (Request 17)
+  // =====================
+
+  /**
+   * Add the currently selected bone to the selection order for manual reordering
+   * Duplicates are ignored (bone kept at its first position)
+   */
+  addToSelectionOrder() {
+    const bone = this.getSelectedBone();
+    if (!bone) return;
+
+    // Only add if not already in the list (preserves first-insert position)
+    if (!this.selectionOrder.includes(bone.id)) {
+      this.selectionOrder.push(bone.id);
+    }
+  }
+
+  /**
+   * Auto-assign Z-depth values based on bone Y position
+   * Higher Y position = higher Z-depth (renders in front)
+   * Bones at the same Y position get the same Z-depth
+   * Z-depth values are assigned sequentially starting from 0
+   */
+  sortByYPosition() {
+    if (!this.isActive || !this.skeleton) return;
+
+    // Collect all bones with their Y positions
+    const bonesWithY = [];
+    for (const bone of Object.values(this.skeleton.bones)) {
+      bonesWithY.push({ bone, y: bone.position.y });
+    }
+
+    // Sort by Y position ascending (lowest Y first gets lowest depth)
+    bonesWithY.sort((a, b) => a.y - b.y);
+
+    // Assign sequential Z-depth values; bones at same Y get same depth
+    // Lowest Y gets depth 0, highest Y gets highest depth
+    let depth = 0;
+    if (bonesWithY.length > 0) {
+      bonesWithY[0].bone.zDepth = depth;
+    }
+
+    for (let i = 1; i < bonesWithY.length; i++) {
+      // Compare Y positions with a small epsilon for floating point
+      if (Math.abs(bonesWithY[i].y - bonesWithY[i - 1].y) < 0.0001) {
+        // Same Y position: same Z-depth
+        bonesWithY[i].bone.zDepth = bonesWithY[i - 1].bone.zDepth;
+      } else {
+        // Different Y: increment depth (higher Y = higher depth)
+        depth++;
+        bonesWithY[i].bone.zDepth = depth;
+      }
+    }
+  }
+
+  /**
+   * Assign Z-depth values based on the manual selection order
+   * First added bone gets Z-depth 0 (back), last added gets highest (front)
+   * Bones not in the selection order are untouched
+   */
+  sortBySelectionOrder() {
+    if (!this.isActive || !this.skeleton) return;
+    if (this.selectionOrder.length === 0) return;
+
+    for (let i = 0; i < this.selectionOrder.length; i++) {
+      const bone = this.skeleton.getBone(this.selectionOrder[i]);
+      if (bone) {
+        bone.zDepth = i;
+      }
+    }
+  }
+
+  /**
+   * Clear the selection order list
+   */
+  clearSelectionOrder() {
+    this.selectionOrder = [];
+  }
+
+  // =====================
   // Generic Property Access
   // =====================
 
   /**
    * Get a named property from the selected bone
-   * @param {string} propertyName - Property name: 'position', 'rotation', 'scale', 'socketOffset'
-   * @returns {Object|null} The property value, or null
+   * @param {string} propertyName - Property name: 'position', 'rotation', 'scale', 'socketOffset', 'zDepth'
+   * @returns {Object|number|null} The property value, or null
    */
   getBoneProperty(propertyName) {
     const bone = this.getSelectedBone();
@@ -313,6 +433,8 @@ class PuppetEditor {
         return { x: bone.scale.x, y: bone.scale.y, z: bone.scale.z };
       case 'socketOffset':
         return { x: bone.socketOffset.x, y: bone.socketOffset.y };
+      case 'zDepth':
+        return bone.zDepth;
       default:
         return null;
     }
@@ -320,8 +442,8 @@ class PuppetEditor {
 
   /**
    * Set a named property on the selected bone
-   * @param {string} propertyName - Property name: 'position', 'rotation', 'scale', 'socketOffset'
-   * @param {Object} value - The property value to set
+   * @param {string} propertyName - Property name: 'position', 'rotation', 'scale', 'socketOffset', 'zDepth'
+   * @param {Object|number} value - The property value to set
    */
   setBoneProperty(propertyName, value) {
     const bone = this.getSelectedBone();
@@ -340,6 +462,9 @@ class PuppetEditor {
       case 'socketOffset':
         this.setSocketOffset(value);
         break;
+      case 'zDepth':
+        this.setBoneZDepth(value);
+        break;
       // Unknown property: silently ignore
       default:
         break;
@@ -352,7 +477,7 @@ class PuppetEditor {
 
   /**
    * Get a list of all bones with their metadata for the UI bone list panel
-   * @returns {Array<Object>} Array of bone info objects {id, name, parentId}
+   * @returns {Array<Object>} Array of bone info objects {id, name, parentId, zDepth}
    */
   getBoneList() {
     if (!this.isActive || !this.skeleton) return [];
@@ -363,6 +488,7 @@ class PuppetEditor {
         id: bone.id,
         name: bone.name,
         parentId: bone.parentId,
+        zDepth: bone.zDepth,
       });
     }
     return list;

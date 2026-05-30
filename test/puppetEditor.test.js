@@ -901,3 +901,379 @@ describe('PuppetEditor - Bone iteration', () => {
     expect(rightArm.rotation.z).toBe(-Math.PI / 4);
   });
 });
+
+// ========================
+// Request 17: Z-Depth Control Tests
+// ========================
+
+describe('PuppetEditor - Z-Depth: setBoneZDepth()', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+    editor.selectBone('torso');
+  });
+
+  it('should set Z-depth to a positive value', () => {
+    editor.setBoneZDepth(5);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(5);
+  });
+
+  it('should set Z-depth to a negative value', () => {
+    editor.setBoneZDepth(-3);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(-3);
+  });
+
+  it('should set Z-depth to zero', () => {
+    editor.setBoneZDepth(0);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(0);
+  });
+
+  it('should clamp Z-depth to maximum of 10', () => {
+    editor.setBoneZDepth(15);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(10);
+  });
+
+  it('should clamp Z-depth to minimum of -10', () => {
+    editor.setBoneZDepth(-15);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(-10);
+  });
+
+  it('should allow boundary value of exactly 10', () => {
+    editor.setBoneZDepth(10);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(10);
+  });
+
+  it('should allow boundary value of exactly -10', () => {
+    editor.setBoneZDepth(-10);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(-10);
+  });
+
+  it('should not update Z-depth if no bone selected', () => {
+    editor.deselectBone();
+    expect(() => editor.setBoneZDepth(5)).not.toThrow();
+  });
+
+  it('should not update Z-depth if not active', () => {
+    editor.deactivate();
+    expect(() => editor.setBoneZDepth(5)).not.toThrow();
+  });
+
+  it('should reject non-numeric Z-depth values', () => {
+    editor.setBoneZDepth('invalid');
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(0); // unchanged from default
+  });
+
+  it('should reject NaN Z-depth values', () => {
+    editor.setBoneZDepth(NaN);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(0); // unchanged from default
+  });
+
+  it('should reject Infinity Z-depth values', () => {
+    editor.setBoneZDepth(Infinity);
+    const bone = editor.getSelectedBone();
+    // Infinity should be clamped to 10
+    expect(bone.zDepth).toBe(10);
+  });
+});
+
+describe('PuppetEditor - Z-Depth: getBoneZDepth()', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+    editor.selectBone('torso');
+  });
+
+  it('should get the current Z-depth of selected bone', () => {
+    editor.setBoneZDepth(3);
+    expect(editor.getBoneZDepth()).toBe(3);
+  });
+
+  it('should return default Z-depth of 0 when not set', () => {
+    expect(editor.getBoneZDepth()).toBe(0);
+  });
+
+  it('should return null when no bone selected', () => {
+    editor.deselectBone();
+    expect(editor.getBoneZDepth()).toBeNull();
+  });
+
+  it('should return null when not active', () => {
+    editor.deactivate();
+    expect(editor.getBoneZDepth()).toBeNull();
+  });
+});
+
+describe('PuppetEditor - Z-Depth: getBoneList() includes zDepth', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+  });
+
+  it('should include zDepth in each bone info object', () => {
+    const boneList = editor.getBoneList();
+    for (const boneInfo of boneList) {
+      expect(boneInfo).toHaveProperty('zDepth');
+    }
+  });
+
+  it('should reflect updated zDepth in bone list', () => {
+    editor.selectBone('torso');
+    editor.setBoneZDepth(5);
+
+    const boneList = editor.getBoneList();
+    const torsoInfo = boneList.find(b => b.id === 'torso');
+    expect(torsoInfo.zDepth).toBe(5);
+  });
+});
+
+describe('PuppetEditor - Z-Depth: sortByYPosition()', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+  });
+
+  it('should auto-assign Z-depth based on Y position', () => {
+    // head is at y=1.2 (highest), torso at y=0, arms at y=0.4
+    editor.sortByYPosition();
+
+    const head = puppet.skeleton.getBone('head');
+    const torso = puppet.skeleton.getBone('torso');
+    const leftArm = puppet.skeleton.getBone('upper-arm-l');
+
+    // Higher Y position should get higher Z-depth
+    expect(head.zDepth).toBeGreaterThan(torso.zDepth);
+    expect(leftArm.zDepth).toBeGreaterThan(torso.zDepth);
+  });
+
+  it('should assign sequential Z-depth values starting from 0', () => {
+    editor.sortByYPosition();
+
+    const boneList = editor.getBoneList();
+    const zDepths = boneList.map(b => b.zDepth).sort((a, b) => a - b);
+    
+    // Should start at 0 and increment by 1
+    expect(zDepths[0]).toBe(0);
+    expect(zDepths.length).toBe(4);
+  });
+
+  it('should not sort if not active', () => {
+    editor.deactivate();
+    expect(() => editor.sortByYPosition()).not.toThrow();
+  });
+
+  it('should handle bones at the same Y position', () => {
+    // upper-arm-l and upper-arm-r are both at y=0.4
+    editor.sortByYPosition();
+
+    const leftArm = puppet.skeleton.getBone('upper-arm-l');
+    const rightArm = puppet.skeleton.getBone('upper-arm-r');
+
+    // Bones at the same Y should get the same Z-depth
+    expect(leftArm.zDepth).toBe(rightArm.zDepth);
+  });
+});
+
+describe('PuppetEditor - Z-Depth: sortBySelectionOrder()', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+  });
+
+  it('should assign Z-depth based on selection order', () => {
+    // Select bones in a specific order
+    editor.selectBone('torso');
+    editor.addToSelectionOrder();
+    editor.selectBone('head');
+    editor.addToSelectionOrder();
+    editor.selectBone('upper-arm-l');
+    editor.addToSelectionOrder();
+
+    editor.sortBySelectionOrder();
+
+    // First selected gets lowest Z-depth, last selected gets highest
+    const torso = puppet.skeleton.getBone('torso');
+    const head = puppet.skeleton.getBone('head');
+    const leftArm = puppet.skeleton.getBone('upper-arm-l');
+
+    expect(torso.zDepth).toBe(0);
+    expect(head.zDepth).toBe(1);
+    expect(leftArm.zDepth).toBe(2);
+  });
+
+  it('should handle empty selection order gracefully', () => {
+    expect(() => editor.sortBySelectionOrder()).not.toThrow();
+  });
+
+  it('should not sort if not active', () => {
+    editor.deactivate();
+    expect(() => editor.sortBySelectionOrder()).not.toThrow();
+  });
+
+  it('should deduplicate bones in selection order', () => {
+    editor.selectBone('torso');
+    editor.addToSelectionOrder();
+    editor.addToSelectionOrder(); // Duplicate
+
+    editor.sortBySelectionOrder();
+
+    const torso = puppet.skeleton.getBone('torso');
+    expect(torso.zDepth).toBe(0);
+  });
+});
+
+describe('PuppetEditor - Z-Depth: export includes zDepth', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+  });
+
+  it('should export zDepth for all bones in config', () => {
+    editor.selectBone('torso');
+    editor.setBoneZDepth(3);
+
+    editor.selectBone('head');
+    editor.setBoneZDepth(5);
+
+    const config = editor.exportConfig();
+    const torsoConfig = config.bones.find(b => b.id === 'torso');
+    const headConfig = config.bones.find(b => b.id === 'head');
+
+    expect(torsoConfig.zDepth).toBe(3);
+    expect(headConfig.zDepth).toBe(5);
+  });
+
+  it('should export zDepth as 0 for bones not explicitly set', () => {
+    const config = editor.exportConfig();
+    const torsoConfig = config.bones.find(b => b.id === 'torso');
+    expect(torsoConfig.zDepth).toBe(0);
+  });
+
+  it('should export zDepth in JSON string', () => {
+    editor.selectBone('head');
+    editor.setBoneZDepth(7);
+
+    const json = editor.exportJSON();
+    const parsed = JSON.parse(json);
+    const headConfig = parsed.bones.find(b => b.id === 'head');
+    expect(headConfig.zDepth).toBe(7);
+  });
+});
+
+describe('PuppetEditor - Z-Depth: hasChanges detects zDepth changes', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+    editor.selectBone('torso');
+  });
+
+  it('should detect zDepth changes as pending changes', () => {
+    expect(editor.hasChanges()).toBe(false);
+    editor.setBoneZDepth(5);
+    expect(editor.hasChanges()).toBe(true);
+  });
+
+  it('should report no changes after reset of zDepth', () => {
+    editor.setBoneZDepth(5);
+    expect(editor.hasChanges()).toBe(true);
+    editor.resetToOriginal();
+    expect(editor.hasChanges()).toBe(false);
+  });
+});
+
+describe('PuppetEditor - Z-Depth: getBoneProperty zDepth', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+    editor.selectBone('torso');
+  });
+
+  it('should get zDepth via getBoneProperty', () => {
+    editor.setBoneZDepth(4);
+    const zDepth = editor.getBoneProperty('zDepth');
+    expect(zDepth).toBe(4);
+  });
+
+  it('should return null for zDepth when no bone selected', () => {
+    editor.deselectBone();
+    expect(editor.getBoneProperty('zDepth')).toBeNull();
+  });
+});
+
+describe('PuppetEditor - Z-Depth: setBoneProperty zDepth', () => {
+  let editor;
+  let puppet;
+
+  beforeEach(() => {
+    puppet = new Puppet({ id: 'puppet-1', name: 'TestPlayer' });
+    puppet.load(mockSkeletonConfig, 'http://localhost:3000/assets');
+    editor = new PuppetEditor();
+    editor.activate(puppet);
+    editor.selectBone('torso');
+  });
+
+  it('should set zDepth via setBoneProperty', () => {
+    editor.setBoneProperty('zDepth', 6);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(6);
+  });
+
+  it('should clamp zDepth via setBoneProperty', () => {
+    editor.setBoneProperty('zDepth', 50);
+    const bone = editor.getSelectedBone();
+    expect(bone.zDepth).toBe(10);
+  });
+
+  it('should not set zDepth when no bone selected', () => {
+    editor.deselectBone();
+    expect(() => editor.setBoneProperty('zDepth', 5)).not.toThrow();
+  });
+});

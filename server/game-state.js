@@ -5,6 +5,24 @@
 
 class GameState {
   /**
+   * Initialize the GameState with all network optimization features
+   */
+  constructor() {
+    // Delta/broadcast caching
+    this._cachedStates = {};
+    // Throttle control: default 50ms = 20Hz max
+    this._throttleInterval = 50;
+    this._lastUpdateTimes = new Map();
+    // Animation batching buffer
+    this._animationBatch = [];
+    // Connection quality ping history (max 10 entries per player)
+    this._pingHistory = new Map();
+    this._maxPingHistory = 10;
+    // Animation time tracking for drift correction
+    this._animationTimes = new Map();
+  }
+
+  /**
    * Pre-defined stage locations for puppet positioning
    * @returns {Object} Stage location definitions
    */
@@ -214,6 +232,346 @@ class GameState {
    */
   getPlayersMap() {
     return this.players;
+  }
+
+  // ============================================================
+  // State Delta Updates
+  // ============================================================
+
+  /**
+   * Update cached states for all players (snapshots current state)
+   */
+  updateCachedStates() {
+    if (!this.players) return;
+    this._cachedStates = {};
+    for (const [playerId, player] of this.players) {
+      this._cachedStates[playerId] = this._deepClone(player);
+    }
+  }
+
+  /**
+   * Get the current cached states
+   * @returns {Object} Cached states keyed by playerId
+   */
+  getCachedStates() {
+    return this._cachedStates;
+  }
+
+  /**
+   * Compute the delta between a cached state and the current state for a player
+   * @param {string} playerId - The player's session ID
+   * @param {Object} cachedState - The previously cached state to compare against
+   * @returns {Object|null} Delta object with only changed fields, or null if player not found
+   */
+  computeDelta(playerId, cachedState) {
+    const current = this.players?.get(playerId);
+    if (!current) return null;
+
+    const delta = {};
+
+    // Compare position
+    if (!this._deepEqual(cachedState.position, current.position)) {
+      delta.position = {
+        old: this._deepClone(cachedState.position),
+        new: this._deepClone(current.position),
+      };
+    }
+
+    // Compare currentAnimation
+    if (!this._deepEqual(cachedState.currentAnimation, current.currentAnimation)) {
+      delta.currentAnimation = {
+        old: this._deepClone(cachedState.currentAnimation),
+        new: this._deepClone(current.currentAnimation),
+      };
+    }
+
+    // Compare isLocked
+    if (cachedState.isLocked !== current.isLocked) {
+      delta.isLocked = {
+        old: cachedState.isLocked,
+        new: current.isLocked,
+      };
+    }
+
+    // Compare puppetConfig
+    if (!this._deepEqual(cachedState.puppetConfig, current.puppetConfig)) {
+      delta.puppetConfig = {
+        old: this._deepClone(cachedState.puppetConfig),
+        new: this._deepClone(current.puppetConfig),
+      };
+    }
+
+    return delta;
+  }
+
+  /**
+   * Deep equality check for two values
+   * @param {*} a - First value
+   * @param {*} b - Second value
+   * @returns {boolean} True if deeply equal
+   */
+  _deepEqual(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  /**
+   * Broadcast delta updates only for players whose state changed since last cache
+   * @param {Object} io - The Socket.io server instance
+   */
+  broadcastDeltaOnly(io) {
+    if (!this.players) return;
+
+    for (const [playerId, player] of this.players) {
+      const cached = this._cachedStates[playerId];
+      if (!cached) continue;
+
+      const delta = this.computeDelta(playerId, cached);
+      // Only broadcast if something actually changed
+      if (delta && Object.keys(delta).length > 0) {
+        io.emit('state-delta-update', {
+          playerId,
+          puppetId: player.puppetId,
+          delta,
+        });
+      }
+    }
+
+    // Update cache after broadcast
+    this.updateCachedStates();
+  }
+
+  // ============================================================
+  // Throttled Position Updates
+  // ============================================================
+
+  /**
+   * Set the throttle interval in milliseconds (default 50ms = 20Hz)
+   * @param {number} intervalMs - Throttle interval
+   */
+  setThrottleInterval(intervalMs) {
+    this._throttleInterval = intervalMs;
+  }
+
+  /**
+   * Check if a player's update can be broadcast (not throttled)
+   * @param {string} playerId - The player's session ID
+   * @returns {boolean} True if update is allowed
+   */
+  canBroadcastUpdate(playerId) {
+    const lastTime = this._lastUpdateTimes.get(playerId) || 0;
+    const now = Date.now();
+    return (now - lastTime) >= this._throttleInterval;
+  }
+
+  /**
+   * Record that an update was broadcast for a player
+   * @param {string} playerId - The player's session ID
+   */
+  recordUpdate(playerId) {
+    this._lastUpdateTimes.set(playerId, Date.now());
+  }
+
+  /**
+   * Get the last update time for a player
+   * @param {string} playerId - The player's session ID
+   * @returns {number} Timestamp in ms, 0 if never updated
+   */
+  getLastUpdateTime(playerId) {
+    return this._lastUpdateTimes.get(playerId) || 0;
+  }
+
+  // ============================================================
+  // Animation State Batching
+  // ============================================================
+
+  /**
+   * Queue an animation update in the batch buffer
+   * @param {string} puppetId - The puppet identifier
+   * @param {Object} update - The animation update data
+   */
+  queueAnimationUpdate(puppetId, update) {
+    // Remove any existing entry for this puppet (last update wins)
+    const existingIndex = this._animationBatch.findIndex(item => item.puppetId === puppetId);
+    if (existingIndex !== -1) {
+      this._animationBatch.splice(existingIndex, 1);
+    }
+
+    this._animationBatch.push({
+      puppetId,
+      update,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Flush the animation batch buffer and return all queued updates
+   * @returns {Array} Array of batched animation updates
+   */
+  flushAnimationBatch() {
+    const batch = [...this._animationBatch];
+    this._animationBatch = [];
+    return batch;
+  }
+
+  // ============================================================
+  // Connection Quality Indicator
+  // ============================================================
+
+  /**
+   * Record a ping measurement for a player
+   * @param {string} playerId - The player's session ID
+   * @param {number} pingMs - Ping time in milliseconds
+   */
+  recordPing(playerId, pingMs) {
+    if (!this._pingHistory.has(playerId)) {
+      this._pingHistory.set(playerId, []);
+    }
+    const history = this._pingHistory.get(playerId);
+    history.push(pingMs);
+    // Limit history size to prevent memory leaks
+    if (history.length > this._maxPingHistory) {
+      history.shift();
+    }
+  }
+
+  /**
+   * Get the average ping for a player
+   * @param {string} playerId - The player's session ID
+   * @returns {number} Average ping in ms, 0 if no data
+   */
+  getAveragePing(playerId) {
+    const history = this._pingHistory.get(playerId);
+    if (!history || history.length === 0) return 0;
+    const sum = history.reduce((acc, val) => acc + val, 0);
+    return sum / history.length;
+  }
+
+  /**
+   * Classify connection quality based on average ping
+   * @param {string} playerId - The player's session ID
+   * @returns {string} 'excellent' (<50ms), 'good' (50-100ms), 'poor' (100-200ms), 'critical' (>200ms), or 'unknown'
+   */
+  getConnectionQuality(playerId) {
+    const avg = this.getAveragePing(playerId);
+    if (avg === 0) return 'unknown';
+    if (avg < 50) return 'excellent';
+    if (avg < 100) return 'good';
+    if (avg < 200) return 'poor';
+    return 'critical';
+  }
+
+  // ============================================================
+  // Animation Sync Drift Correction
+  // ============================================================
+
+  /**
+   * Set animation timing info for drift tracking
+   * @param {string} playerId - The player's session ID
+   * @param {number} serverTime - Server animation time
+   * @param {number} clientTime - Client reported animation time
+   */
+  setAnimationTime(playerId, serverTime, clientTime) {
+    this._animationTimes.set(playerId, { serverTime, clientTime });
+  }
+
+  /**
+   * Get the animation drift (difference between client and server time)
+   * @param {string} playerId - The player's session ID
+   * @returns {number|null} Drift in ms, or null if no animation tracked
+   */
+  getAnimationDrift(playerId) {
+    const timing = this._animationTimes.get(playerId);
+    if (!timing) return null;
+    return Math.abs(timing.clientTime - timing.serverTime);
+  }
+
+  /**
+   * Check if animation resync is needed based on drift tolerance
+   * @param {string} playerId - The player's session ID
+   * @param {number} toleranceMs - Maximum allowed drift in ms (default 200)
+   * @returns {boolean} True if resync is needed
+   */
+  needsAnimationResync(playerId, toleranceMs = 200) {
+    const drift = this.getAnimationDrift(playerId);
+    if (drift === null) return false;
+    return drift > toleranceMs;
+  }
+
+  // ============================================================
+  // Asset Loading Fallback
+  // ============================================================
+
+  /**
+   * Get the default puppet configuration (fallback when loading fails)
+   * @returns {Object} Default puppet skeleton config
+   */
+  getDefaultPuppetConfig() {
+    return {
+      name: 'Default Puppet',
+      bones: [
+        {
+          id: 'torso',
+          name: 'Torso',
+          parentId: null,
+          asset: 'torso.png',
+          position: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1 },
+        },
+        {
+          id: 'head',
+          name: 'Head',
+          parentId: 'torso',
+          asset: 'head.png',
+          socketOffset: { x: 0, y: 1.2 },
+          scale: { x: 0.8, y: 0.8 },
+        },
+        {
+          id: 'upper-arm-l',
+          name: 'Upper Arm Left',
+          parentId: 'torso',
+          asset: 'upper-arm-l.png',
+          socketOffset: { x: -0.8, y: 0.5 },
+          scale: { x: 0.5, y: 0.8 },
+        },
+        {
+          id: 'upper-arm-r',
+          name: 'Upper Arm Right',
+          parentId: 'torso',
+          asset: 'upper-arm-r.png',
+          socketOffset: { x: 0.8, y: 0.5 },
+          scale: { x: 0.5, y: 0.8 },
+        },
+        {
+          id: 'upper-leg-l',
+          name: 'Upper Leg Left',
+          parentId: 'torso',
+          asset: 'upper-leg-l.png',
+          socketOffset: { x: -0.4, y: -0.8 },
+          scale: { x: 0.5, y: 0.8 },
+        },
+        {
+          id: 'upper-leg-r',
+          name: 'Upper Leg Right',
+          parentId: 'torso',
+          asset: 'upper-leg-r.png',
+          socketOffset: { x: 0.4, y: -0.8 },
+          scale: { x: 0.5, y: 0.8 },
+        },
+      ],
+    };
+  }
+
+  /**
+   * Resolve a puppet config, falling back to default if invalid
+   * @param {string} playerId - The player's session ID
+   * @param {Object|null} config - The puppet config to validate
+   * @returns {Object} Valid puppet config (either provided or default)
+   */
+  resolvePuppetConfig(playerId, config) {
+    if (config && config.name && Array.isArray(config.bones) && config.bones.length > 0) {
+      return config;
+    }
+    return this.getDefaultPuppetConfig();
   }
 }
 

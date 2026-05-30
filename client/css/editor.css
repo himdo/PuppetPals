@@ -1,283 +1,47 @@
-/** PuppetPals Editor & Asset Browser Styles */
+/** Puppet Editor UI Styles
+ * Styles for the in-browser puppet editor panel
+ * Includes bone list, properties panel, socket editor, and action buttons
+ */
 
-/* ===== Asset Browser Panel ===== */
-.asset-browser {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: #1e1e2e;
-  color: #cdd6f4;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 14px;
-  overflow: hidden;
-}
+/* =====================
+ * Editor Container
+ * ===================== */
 
-.asset-browser h3 {
-  margin: 0;
-  padding: 12px 16px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #cba6f7;
-  border-bottom: 1px solid #313244;
-  background: #181825;
-}
-
-/* ===== Asset Tabs ===== */
-.asset-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 12px;
-  background: #181825;
-  border-bottom: 1px solid #313244;
-}
-
-.asset-tab {
-  flex: 1;
-  padding: 8px 12px;
-  background: #313244;
-  color: #a6adc8;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 0.2s, color 0.2s;
-}
-
-.asset-tab:hover {
-  background: #45475a;
-  color: #cdd6f4;
-}
-
-.asset-tab.active {
-  background: #89b4fa;
-  color: #1e1e2e;
-}
-
-/* ===== Asset Upload Section ===== */
-.asset-upload-section {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px;
-  background: #181825;
-  border-bottom: 1px solid #313244;
-  align-items: center;
-}
-
-#asset-upload-btn {
-  padding: 8px 16px;
-  background: #a6e3a1;
-  color: #1e1e2e;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.2s;
-}
-
-#asset-upload-btn:hover {
-  background: #94e2d5;
-}
-
-#asset-category-select {
-  flex: 1;
-  min-width: 100px;
-  padding: 8px 12px;
-  background: #313244;
-  color: #cdd6f4;
-  border: 1px solid #45475a;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-#asset-subgroup-input {
-  flex: 2;
-  min-width: 120px;
-  padding: 8px 12px;
-  background: #313244;
-  color: #cdd6f4;
-  border: 1px solid #45475a;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-#asset-subgroup-input::placeholder {
-  color: #6c7086;
-}
-
-/* ===== Asset List ===== */
-.asset-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.asset-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.asset-list::-webkit-scrollbar-track {
-  background: #1e1e2e;
-}
-
-.asset-list::-webkit-scrollbar-thumb {
-  background: #45475a;
-  border-radius: 3px;
-}
-
-.asset-list::-webkit-scrollbar-thumb:hover {
-  background: #585b70;
-}
-
-.asset-empty {
-  text-align: center;
-  color: #6c7086;
-  padding: 32px 16px;
-  font-style: italic;
-}
-
-/* ===== Asset Item ===== */
-.asset-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: #313244;
-  border-radius: 8px;
-  transition: background 0.2s;
-}
-
-.asset-item:hover {
-  background: #45475a;
-}
-
-/* ===== Asset Thumbnail ===== */
-.asset-thumbnail {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 6px;
-  background: #1e1e2e;
-  flex-shrink: 0;
-  border: 1px solid #45475a;
-}
-
-.asset-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: #1e1e2e;
-  border-radius: 6px;
-  border: 1px solid #45475a;
-  color: #f9e2af;
-  font-size: 18px;
-  font-weight: bold;
-  flex-shrink: 0;
-}
-
-/* ===== Asset Info ===== */
-.asset-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.asset-name {
-  font-weight: 500;
-  color: #cdd6f4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.asset-size {
-  font-size: 11px;
-  color: #6c7086;
-}
-
-.asset-subgroup {
-  font-size: 11px;
-  color: #89b4fa;
-  background: #45475a;
-  padding: 2px 6px;
-  border-radius: 4px;
-  display: inline-block;
-  width: fit-content;
-}
-
-/* ===== Asset Delete Button ===== */
-.asset-delete-btn {
-  padding: 6px 12px;
-  background: #f38ba8;
-  color: #1e1e2e;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-
-.asset-delete-btn:hover {
-  background: #eba0ac;
-}
-
-/* ===== Asset Actions ===== */
-.asset-actions {
-  padding: 12px;
-  border-top: 1px solid #313244;
-  background: #181825;
-}
-
-#asset-refresh-btn {
-  width: 100%;
-  padding: 8px 16px;
-  background: #89b4fa;
-  color: #1e1e2e;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.2s;
-}
-
-#asset-refresh-btn:hover {
-  background: #74c7ec;
-}
-
-/* Notifications handled by main.css */
-
-/* ===== Asset Panel Toggle ===== */
-#asset-panel {
+.puppet-editor-overlay {
   position: fixed;
   top: 0;
-  right: 0;
-  width: 360px;
-  height: 100vh;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.puppet-editor-overlay.active {
+  display: flex;
+}
+
+.puppet-editor-container {
   background: #1e1e2e;
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  color: #cdd6f4;
+  border-radius: 8px;
+  width: 900px;
+  max-width: 95vw;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
-#asset-panel.hidden {
-  transform: translateX(100%);
-}
+/* =====================
+ * Editor Header
+ * ===================== */
 
-#asset-panel-header {
+.puppet-editor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -286,64 +50,507 @@
   border-bottom: 1px solid #313244;
 }
 
-#asset-panel-header h3 {
+.puppet-editor-header h2 {
   margin: 0;
+  font-size: 18px;
+  font-weight: 600;
   color: #cba6f7;
-  font-size: 16px;
 }
 
-#close-asset-panel {
-  background: #f38ba8;
-  color: #1e1e2e;
-  border: none;
-  border-radius: 6px;
-  width: 32px;
-  height: 32px;
+.puppet-editor-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* =====================
+ * Editor Body Layout
+ * ===================== */
+
+.puppet-editor-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* =====================
+ * Bone List Panel (Left)
+ * ===================== */
+
+.puppet-editor-bone-list {
+  width: 220px;
+  min-width: 180px;
+  background: #181825;
+  border-right: 1px solid #313244;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.puppet-editor-bone-list h3 {
+  margin: 0 0 8px 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6c7086;
+  letter-spacing: 0.5px;
+}
+
+.bone-list-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
   cursor: pointer;
-  font-size: 16px;
-  font-weight: bold;
+  transition: background 0.15s;
+  font-size: 14px;
+  user-select: none;
+}
+
+.bone-list-item:hover {
+  background: #313244;
+}
+
+.bone-list-item.selected {
+  background: #45475a;
+  color: #cba6f7;
+}
+
+.bone-list-item .bone-indent {
+  display: inline-block;
+  width: 16px;
+}
+
+.bone-list-item .bone-icon {
+  margin-right: 6px;
+  font-size: 12px;
+  color: #6c7086;
+}
+
+.bone-list-item .bone-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bone-list-item .bone-asset {
+  font-size: 10px;
+  color: #6c7086;
+  margin-left: 4px;
+}
+
+/* =====================
+ * Properties Panel (Right)
+ * ===================== */
+
+.puppet-editor-properties {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.puppet-editor-properties h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cba6f7;
+}
+
+.property-section {
+  margin-bottom: 20px;
+}
+
+.property-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6c7086;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #313244;
+}
+
+.property-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.property-label {
+  width: 80px;
+  font-size: 13px;
+  color: #a6adc8;
+  flex-shrink: 0;
+}
+
+.property-input {
+  flex: 1;
+  background: #1e1e2e;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  color: #cdd6f4;
+  padding: 4px 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.property-input:focus {
+  outline: none;
+  border-color: #cba6f7;
+}
+
+.property-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: #313244;
+  border-radius: 2px;
+  outline: none;
+}
+
+.property-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #cba6f7;
+  cursor: pointer;
+}
+
+.property-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #cba6f7;
+  cursor: pointer;
+  border: none;
+}
+
+.property-value {
+  width: 60px;
+  text-align: right;
+  font-size: 13px;
+  color: #a6adc8;
+  font-family: monospace;
+}
+
+/* Asset selector */
+.property-select {
+  flex: 1;
+  background: #1e1e2e;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  color: #cdd6f4;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.property-select:focus {
+  outline: none;
+  border-color: #cba6f7;
+}
+
+/* =====================
+ * No Selection State
+ * ===================== */
+
+.puppet-editor-no-selection {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  flex: 1;
+  color: #6c7086;
+  font-size: 14px;
+  text-align: center;
+  padding: 40px;
 }
 
-#close-asset-panel:hover {
-  background: #eba0ac;
+/* =====================
+ * Editor Footer / Buttons
+ * ===================== */
+
+.puppet-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #181825;
+  border-top: 1px solid #313244;
 }
 
-#toggle-asset-panel {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  z-index: 99;
-  padding: 8px 16px;
+.puppet-editor-footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.puppet-editor-footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+/* =====================
+ * Buttons
+ * ===================== */
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-secondary {
+  background: #313244;
+  color: #cdd6f4;
+}
+
+.btn-secondary:hover {
+  background: #45475a;
+}
+
+.btn-primary {
   background: #cba6f7;
   color: #1e1e2e;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.2s;
 }
 
-#toggle-asset-panel:hover {
+.btn-primary:hover {
   background: #b4befe;
 }
 
-/* ===== Responsive ===== */
-@media (max-width: 480px) {
-  #asset-panel {
+.btn-danger {
+  background: #f38ba8;
+  color: #1e1e2e;
+}
+
+.btn-danger:hover {
+  background: #eba0ac;
+}
+
+.btn-success {
+  background: #a6e3a1;
+  color: #1e1e2e;
+}
+
+.btn-success:hover {
+  background: #94e2d5;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =====================
+ * Changes Indicator
+ * ===================== */
+
+.changes-indicator {
+  font-size: 12px;
+  color: #f9e2af;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.changes-indicator .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f9e2af;
+}
+
+.changes-indicator.saved .dot {
+  background: #a6e3a1;
+}
+
+.changes-indicator.saved {
+  color: #a6e3a1;
+}
+
+/* =====================
+ * Socket Points Visualization
+ * ===================== */
+
+.socket-point-indicator {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f9e2af;
+  border: 2px solid #1e1e2e;
+  cursor: grab;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.socket-point-indicator:hover {
+  background: #fab387;
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+.socket-point-indicator:active {
+  cursor: grabbing;
+}
+
+/* =====================
+ * Scrollbar Styling
+ * ===================== */
+
+.puppet-editor-bone-list::-webkit-scrollbar,
+.puppet-editor-properties::-webkit-scrollbar {
+  width: 6px;
+}
+
+.puppet-editor-bone-list::-webkit-scrollbar-track,
+.puppet-editor-properties::-webkit-scrollbar-track {
+  background: #1e1e2e;
+}
+
+.puppet-editor-bone-list::-webkit-scrollbar-thumb,
+.puppet-editor-properties::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 3px;
+}
+
+.puppet-editor-bone-list::-webkit-scrollbar-thumb:hover,
+.puppet-editor-properties::-webkit-scrollbar-thumb:hover {
+  background: #585b70;
+}
+
+/* =====================
+ * Asset Browser Panel
+ * ===================== */
+
+.asset-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: #181825;
+  border-radius: 6px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.asset-browser h3 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #cba6f7;
+}
+
+/* Asset Upload */
+
+.asset-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 2px dashed #313244;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.asset-upload:hover {
+  border-color: #cba6f7;
+  background: rgba(203, 166, 247, 0.05);
+}
+
+.asset-upload-label {
+  flex: 1;
+  font-size: 13px;
+  color: #a6adc8;
+}
+
+.asset-upload-input {
+  display: none;
+}
+
+/* Asset List */
+
+.asset-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* Asset Item */
+
+.asset-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  background: #1e1e2e;
+  border: 1px solid #313244;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.asset-item:hover {
+  border-color: #cba6f7;
+  background: #313244;
+}
+
+.asset-item.selected {
+  border-color: #cba6f7;
+  background: #45475a;
+}
+
+.asset-item-name {
+  font-size: 11px;
+  color: #a6adc8;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* Asset Thumbnail */
+
+.asset-thumbnail {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: #1e1e2e;
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+
+/* =====================
+ * Responsive Adjustments
+ * ===================== */
+
+@media (max-width: 768px) {
+  .puppet-editor-container {
     width: 100%;
+    height: 100%;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
   }
 
-  .asset-upload-section {
+  .puppet-editor-body {
     flex-direction: column;
   }
 
-  #asset-category-select,
-  #asset-subgroup-input {
+  .puppet-editor-bone-list {
     width: 100%;
+    max-height: 150px;
+    border-right: none;
+    border-bottom: 1px solid #313244;
   }
 }

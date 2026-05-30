@@ -96,6 +96,13 @@ describe('MeshLoader Class - createPlaneMesh()', () => {
     const mesh = loader.createPlaneMesh(mockTexture, 1, 1, 'torso');
     expect(mesh.name).toBe('torso');
   });
+
+  it('should set depthWrite to false for proper 2D sprite overlap', () => {
+    const loader = new MeshLoader();
+    const mockTexture = { width: 100, height: 200 };
+    const mesh = loader.createPlaneMesh(mockTexture, 1, 1, 'torso');
+    expect(mesh.material.depthWrite).toBe(false);
+  });
 });
 
 describe('MeshLoader Class - loadBoneMesh()', () => {

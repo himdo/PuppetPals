@@ -36,6 +36,8 @@ class MeshLoader {
 
   /**
    * Create a plane mesh from a texture with specified dimensions
+   * Uses MeshBasicMaterial with transparent: true and depthWrite: false
+   * for proper 2D sprite overlap rendering
    * @param {Object} texture - The Three.js texture
    * @param {number} width - Plane width
    * @param {number} height - Plane height
@@ -48,6 +50,7 @@ class MeshLoader {
       map: texture,
       transparent: true,
       side: THREE.DoubleSide,
+      depthWrite: false,
     });
 
     const mesh = new THREE.Mesh(geometry, material);

@@ -354,6 +354,123 @@ describe('Bone Class - Hierarchy Integration', () => {
   });
 });
 
+describe('Bone Class - zDepth', () => {
+  it('should default zDepth to 0', () => {
+    const bone = new Bone({ id: 'torso', name: 'Torso' });
+    expect(bone.zDepth).toBe(0);
+  });
+
+  it('should accept custom zDepth from config', () => {
+    const bone = new Bone({ id: 'head', name: 'Head', zDepth: 3 });
+    expect(bone.zDepth).toBe(3);
+  });
+
+  it('should accept negative zDepth values', () => {
+    const bone = new Bone({ id: 'bg', name: 'Background', zDepth: -2 });
+    expect(bone.zDepth).toBe(-2);
+  });
+
+  it('should accept large zDepth values', () => {
+    const bone = new Bone({ id: 'fg', name: 'Foreground', zDepth: 10 });
+    expect(bone.zDepth).toBe(10);
+  });
+
+  it('should provide getZDepth method', () => {
+    const bone = new Bone({ id: 'torso', name: 'Torso', zDepth: 1 });
+    expect(bone.getZDepth()).toBe(1);
+  });
+
+  it('should provide setZDepth method', () => {
+    const bone = new Bone({ id: 'torso', name: 'Torso' });
+    expect(bone.zDepth).toBe(0);
+    bone.setZDepth(5);
+    expect(bone.zDepth).toBe(5);
+  });
+
+  it('should allow setZDepth to change from positive to negative', () => {
+    const bone = new Bone({ id: 'bone', name: 'Bone', zDepth: 3 });
+    bone.setZDepth(-1);
+    expect(bone.zDepth).toBe(-1);
+  });
+
+  it('should apply zDepth to mesh Z position in updateWorldTransform', () => {
+    const bone = new Bone({
+      id: 'head',
+      name: 'Head',
+      position: { x: 0, y: 2, z: 0 },
+      zDepth: 1,
+    });
+    const mockMesh = new THREE.Mesh();
+    bone.setMesh(mockMesh);
+    bone.updateWorldTransform();
+    // mesh z should be position.z + zDepth = 0 + 1 = 1
+    expect(mockMesh.position.z).toBe(1);
+  });
+
+  it('should apply negative zDepth to mesh Z position', () => {
+    const bone = new Bone({
+      id: 'bg',
+      name: 'Background',
+      position: { x: 0, y: 0, z: 0 },
+      zDepth: -2,
+    });
+    const mockMesh = new THREE.Mesh();
+    bone.setMesh(mockMesh);
+    bone.updateWorldTransform();
+    expect(mockMesh.position.z).toBe(-2);
+  });
+
+  it('should combine position.z and zDepth in updateWorldTransform', () => {
+    const bone = new Bone({
+      id: 'bone',
+      name: 'Bone',
+      position: { x: 1, y: 2, z: 3 },
+      zDepth: 4,
+    });
+    const mockMesh = new THREE.Mesh();
+    bone.setMesh(mockMesh);
+    bone.updateWorldTransform();
+    expect(mockMesh.position.x).toBe(1);
+    expect(mockMesh.position.y).toBe(2);
+    // z should be position.z + zDepth = 3 + 4 = 7
+    expect(mockMesh.position.z).toBe(7);
+  });
+
+  it('should update mesh Z when zDepth changes at runtime', () => {
+    const bone = new Bone({
+      id: 'bone',
+      name: 'Bone',
+      position: { x: 0, y: 0, z: 0 },
+      zDepth: 0,
+    });
+    const mockMesh = new THREE.Mesh();
+    bone.setMesh(mockMesh);
+
+    bone.updateWorldTransform();
+    expect(mockMesh.position.z).toBe(0);
+
+    bone.setZDepth(3);
+    bone.updateWorldTransform();
+    expect(mockMesh.position.z).toBe(3);
+  });
+
+  it('should include zDepth in toConfig export', () => {
+    const bone = new Bone({
+      id: 'head',
+      name: 'Head',
+      zDepth: 3,
+    });
+    const config = bone.toConfig();
+    expect(config.zDepth).toBe(3);
+  });
+
+  it('should default zDepth to 0 in toConfig when not set', () => {
+    const bone = new Bone({ id: 'bone', name: 'Bone' });
+    const config = bone.toConfig();
+    expect(config.zDepth).toBe(0);
+  });
+});
+
 describe('Bone Class - Edge Cases', () => {
   it('should handle zero values for position', () => {
     const bone = new Bone({ id: 'bone', name: 'Bone', position: { x: 0, y: 0, z: 0 } });

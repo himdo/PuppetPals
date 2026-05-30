@@ -40,11 +40,32 @@ class Bone {
     const offset = config.socketOffset || { x: 0, y: 0 };
     this.socketOffset = { x: offset.x, y: offset.y };
 
+    // Z-depth for 2D layering (controls render order)
+    // Higher values render in front of lower values
+    this.zDepth = config.zDepth || 0;
+
     // Three.js mesh (the PNG sprite) - set separately after loading
     this.mesh = null;
 
     // Child bones in hierarchy
     this.children = [];
+  }
+
+  /**
+   * Get the current Z-depth value
+   * @returns {number} The zDepth value
+   */
+  getZDepth() {
+    return this.zDepth;
+  }
+
+  /**
+   * Set the Z-depth value for render ordering
+   * Higher values render in front of lower values
+   * @param {number} value - The zDepth value to set
+   */
+  setZDepth(value) {
+    this.zDepth = value;
   }
 
   /**
@@ -134,12 +155,17 @@ class Bone {
   /**
    * Update the attached mesh to reflect current bone transforms
    * Syncs position, rotation, and scale to the mesh
+   * Applies zDepth as an offset to the mesh Z position for 2D layering
    */
   updateWorldTransform() {
     if (!this.mesh) return;
 
-    // Update mesh position to match bone position
-    this.mesh.position.set(this.position.x, this.position.y, this.position.z);
+    // Update mesh position to match bone position, with zDepth offset for 2D layering
+    this.mesh.position.set(
+      this.position.x,
+      this.position.y,
+      this.position.z + this.zDepth
+    );
 
     // Update mesh rotation to match bone rotation
     this.mesh.rotation.set(this.rotation.x, this.rotation.y, this.rotation.z);
@@ -178,6 +204,7 @@ class Bone {
         x: this.socketOffset.x,
         y: this.socketOffset.y,
       },
+      zDepth: this.zDepth,
     };
   }
 }

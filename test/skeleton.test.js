@@ -434,6 +434,151 @@ describe('Skeleton Class - getDescendants()', () => {
   });
 });
 
+describe('Skeleton Class - zDepth Support', () => {
+  it('should parse zDepth from skeleton JSON config', () => {
+    const skeleton = new Skeleton();
+    const config = {
+      name: 'Z-Depth Puppet',
+      bones: [
+        {
+          id: 'torso',
+          name: 'Torso',
+          parentId: null,
+          asset: 'torso.png',
+          zDepth: 1,
+        },
+        {
+          id: 'head',
+          name: 'Head',
+          parentId: 'torso',
+          asset: 'head.png',
+          zDepth: 3,
+        },
+        {
+          id: 'leg',
+          name: 'Leg',
+          parentId: 'torso',
+          asset: 'leg.png',
+          zDepth: 0,
+        },
+      ],
+    };
+    skeleton.loadFromConfig(config);
+    expect(skeleton.getBone('torso').zDepth).toBe(1);
+    expect(skeleton.getBone('head').zDepth).toBe(3);
+    expect(skeleton.getBone('leg').zDepth).toBe(0);
+  });
+
+  it('should default zDepth to 0 when not in config', () => {
+    const skeleton = new Skeleton();
+    const config = {
+      name: 'No Z-Depth',
+      bones: [
+        {
+          id: 'bone',
+          name: 'Bone',
+          parentId: null,
+        },
+      ],
+    };
+    skeleton.loadFromConfig(config);
+    expect(skeleton.getBone('bone').zDepth).toBe(0);
+  });
+
+  it('should support negative zDepth values from config', () => {
+    const skeleton = new Skeleton();
+    const config = {
+      name: 'Negative Z',
+      bones: [
+        {
+          id: 'bg',
+          name: 'Background',
+          parentId: null,
+          zDepth: -2,
+        },
+      ],
+    };
+    skeleton.loadFromConfig(config);
+    expect(skeleton.getBone('bg').zDepth).toBe(-2);
+  });
+
+  it('should provide getBonesByZOrder method', () => {
+    const skeleton = new Skeleton();
+    const config = {
+      name: 'Z-Order Test',
+      bones: [
+        { id: 'head', name: 'Head', parentId: 'torso', zDepth: 3 },
+        { id: 'torso', name: 'Torso', parentId: null, zDepth: 1 },
+        { id: 'leg', name: 'Leg', parentId: 'torso', zDepth: 0 },
+        { id: 'bg', name: 'Background', parentId: null, zDepth: -1 },
+      ],
+    };
+    skeleton.loadFromConfig(config);
+    const sorted = skeleton.getBonesByZOrder();
+    expect(sorted.length).toBe(4);
+    // Should be sorted ascending by zDepth
+    expect(sorted[0].id).toBe('bg');     // zDepth: -1
+    expect(sorted[1].id).toBe('leg');    // zDepth: 0
+    expect(sorted[2].id).toBe('torso');  // zDepth: 1
+    expect(sorted[3].id).toBe('head');   // zDepth: 3
+  });
+
+  it('should return bones sorted ascending (lowest zDepth first)', () => {
+    const skeleton = new Skeleton();
+    const boneA = new Bone({ id: 'a', name: 'A', zDepth: 5 });
+    const boneB = new Bone({ id: 'b', name: 'B', zDepth: -3 });
+    const boneC = new Bone({ id: 'c', name: 'C', zDepth: 2 });
+    skeleton.addBone(boneA);
+    skeleton.addBone(boneB);
+    skeleton.addBone(boneC);
+
+    const sorted = skeleton.getBonesByZOrder();
+    expect(sorted[0]).toBe(boneB);  // -3
+    expect(sorted[1]).toBe(boneC);  // 2
+    expect(sorted[2]).toBe(boneA);  // 5
+  });
+
+  it('should handle equal zDepth values in getBonesByZOrder', () => {
+    const skeleton = new Skeleton();
+    const boneA = new Bone({ id: 'a', name: 'A', zDepth: 1 });
+    const boneB = new Bone({ id: 'b', name: 'B', zDepth: 1 });
+    skeleton.addBone(boneA);
+    skeleton.addBone(boneB);
+
+    const sorted = skeleton.getBonesByZOrder();
+    expect(sorted.length).toBe(2);
+    expect(sorted[0].zDepth).toBe(1);
+    expect(sorted[1].zDepth).toBe(1);
+  });
+
+  it('should return empty array for empty skeleton', () => {
+    const skeleton = new Skeleton();
+    const sorted = skeleton.getBonesByZOrder();
+    expect(sorted).toEqual([]);
+  });
+
+  it('should sort children by zDepth after loading from config', () => {
+    const skeleton = new Skeleton();
+    const config = {
+      name: 'Child Sort Test',
+      bones: [
+        { id: 'torso', name: 'Torso', parentId: null, zDepth: 1 },
+        // Children defined out of zDepth order
+        { id: 'head', name: 'Head', parentId: 'torso', zDepth: 3 },
+        { id: 'leg', name: 'Leg', parentId: 'torso', zDepth: 0 },
+        { id: 'arm', name: 'Arm', parentId: 'torso', zDepth: 2 },
+      ],
+    };
+    skeleton.loadFromConfig(config);
+    const torso = skeleton.getBone('torso');
+    // Children should be sorted by zDepth: leg(0), arm(2), head(3)
+    expect(torso.children.length).toBe(3);
+    expect(torso.children[0].id).toBe('leg');
+    expect(torso.children[1].id).toBe('arm');
+    expect(torso.children[2].id).toBe('head');
+  });
+});
+
 describe('Skeleton Class - Full Puppet Load Scenario', () => {
   it('should load a complete puppet skeleton configuration', () => {
     const skeleton = new Skeleton();

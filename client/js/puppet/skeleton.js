@@ -130,6 +130,7 @@ class Skeleton {
   /**
    * Load skeleton from JSON configuration
    * Clears existing bones first, then builds new hierarchy
+   * After building hierarchy, sorts children by zDepth for correct render order
    * @param {Object} config - Skeleton configuration object
    * @param {string} config.name - Puppet name
    * @param {Array} config.bones - Array of bone configurations
@@ -153,6 +154,7 @@ class Skeleton {
         rotation: boneConfig.rotation || { x: 0, y: 0, z: 0 },
         scale: boneConfig.scale || { x: 1, y: 1, z: 1 },
         socketOffset: boneConfig.socketOffset || { x: 0, y: 0 },
+        zDepth: boneConfig.zDepth || 0,
       };
 
       // Handle 2D scale (x, y only) by adding z: 1
@@ -169,6 +171,22 @@ class Skeleton {
     for (const bone of createdBones) {
       this.addBone(bone);
     }
+
+    // Third pass: sort children by zDepth for correct render order
+    for (const bone of Object.values(this.bones)) {
+      if (bone.children.length > 0) {
+        bone.children.sort((a, b) => a.zDepth - b.zDepth);
+      }
+    }
+  }
+
+  /**
+   * Get all bones sorted by zDepth in ascending order (lowest first)
+   * Lower zDepth values render behind higher zDepth values
+   * @returns {Bone[]} Array of all bones sorted by zDepth ascending
+   */
+  getBonesByZOrder() {
+    return Object.values(this.bones).sort((a, b) => a.zDepth - b.zDepth);
   }
 
   /**

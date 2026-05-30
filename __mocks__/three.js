@@ -59,6 +59,8 @@ class MockObject3D {
   }
 }
 
+class MockObject3DClass extends MockObject3D {}
+
 class MockScene extends MockObject3D {}
 
 class MockPerspectiveCamera extends MockObject3D {
@@ -188,6 +190,7 @@ const MockTHREE = {
   MeshBasicMaterial: MockMeshBasicMaterial,
   MeshLambertMaterial: MockMeshLambertMaterial,
   Mesh: MockMesh,
+  Object3D: MockObject3DClass,
   Vector3: MockVector3,
   Euler: MockEuler,
   OrbitControls: MockOrbitControls,

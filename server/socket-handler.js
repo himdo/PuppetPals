@@ -6,6 +6,7 @@ import SocketEvents from '../shared/protocols.js';
 import AssetManager from './asset-manager.js';
 import AnimationSync from './animation-sync.js';
 import GameState from './game-state.js';
+import AdminController from './admin-controller.js';
 
 class SocketHandler {
   /**
@@ -21,6 +22,8 @@ class SocketHandler {
     this.gameState = new GameState();
     /** @type {Map<string, Object>} Store of custom animations keyed by animation id */
     this.customAnimations = new Map();
+    /** @type {AdminController} Admin controller for master controls */
+    this.adminController = new AdminController(io, authManager, this.gameState, this.animationSync);
   }
 
   /**
@@ -91,6 +94,55 @@ class SocketHandler {
       socket.on(SocketEvents.MOVE_PUPPET, (data) => {
         this.handleMovePuppet(socket, data);
       });
+
+      // ---- Admin Control Events ----
+      socket.on(SocketEvents.ADMIN_MOVE_PUPPET, (data) => {
+        this.handleAdminMovePuppet(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_LOCK_PUPPET, (data) => {
+        this.handleAdminLockPuppet(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_FORCE_ANIMATION, (data) => {
+        this.handleAdminForceAnimation(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_STOP_ANIMATION_PUPPET, (data) => {
+        this.handleAdminStopAnimationPuppet(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_EJECT_PLAYER, (data) => {
+        this.handleAdminEjectPlayer(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_CHANGE_BACKGROUND, (data) => {
+        this.handleAdminChangeBackground(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_OFFSTAGE_PUPPET, (data) => {
+        this.handleAdminOffstagePuppet(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_OVERRIDE_PUPPET, (data) => {
+        this.handleAdminOverridePuppet(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_PAUSE_ALL, (data) => {
+        this.handleAdminPauseAll(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_RESET_ALL, (data) => {
+        this.handleAdminResetAll(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_KICK_ALL, (data) => {
+        this.handleAdminKickAll(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_GET_PLAYERS, (data) => {
+        this.handleAdminGetPlayers(socket, data);
+      });
     });
   }
 
@@ -149,7 +201,6 @@ class SocketHandler {
     const player = this.authManager.getPlayerInfo(socket.id);
 
     // Clean up animations for this player's puppet
-    // We track puppet IDs by session ID; stop all for this session
     if (player) {
       const puppetId = `puppet-${player.sessionId}`;
       this.animationSync.onPuppetDisconnected(puppetId);
@@ -193,7 +244,6 @@ class SocketHandler {
   handleStartAnimation(socket, data) {
     const { puppetId, animation } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -209,10 +259,8 @@ class SocketHandler {
       return;
     }
 
-    // Start animation on server
     this.animationSync.startAnimation(puppetId, player.sessionId, animation, true);
 
-    // Broadcast to all clients
     this.io.emit(SocketEvents.ANIMATION_STARTED, {
       puppetId,
       animation,
@@ -231,7 +279,6 @@ class SocketHandler {
   handleStopAnimation(socket, data) {
     const { puppetId } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -247,10 +294,8 @@ class SocketHandler {
       return;
     }
 
-    // Stop animation on server
     this.animationSync.stopAnimation(puppetId);
 
-    // Broadcast to all clients
     this.io.emit(SocketEvents.ANIMATION_STOPPED, {
       puppetId,
     });
@@ -266,7 +311,6 @@ class SocketHandler {
   handleAdminStartAnimation(socket, data) {
     const { puppetId, animation } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -275,7 +319,6 @@ class SocketHandler {
       return;
     }
 
-    // Check owner role
     if (!this.authManager.isOwner(player.sessionId)) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
         message: 'Only the server owner can force animations on other puppets.',
@@ -290,10 +333,8 @@ class SocketHandler {
       return;
     }
 
-    // Start animation on server (admin override)
     this.animationSync.startAnimation(puppetId, player.sessionId, animation, false);
 
-    // Broadcast to all clients
     this.io.emit(SocketEvents.ANIMATION_STARTED, {
       puppetId,
       animation,
@@ -312,7 +353,6 @@ class SocketHandler {
   handleAdminStopAnimation(socket, data) {
     const { puppetId } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -321,7 +361,6 @@ class SocketHandler {
       return;
     }
 
-    // Check owner role
     if (!this.authManager.isOwner(player.sessionId)) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
         message: 'Only the server owner can force stop animations.',
@@ -336,10 +375,8 @@ class SocketHandler {
       return;
     }
 
-    // Stop animation on server
     this.animationSync.stopAnimation(puppetId);
 
-    // Broadcast to all clients
     this.io.emit(SocketEvents.ANIMATION_STOPPED, {
       puppetId,
     });
@@ -359,7 +396,6 @@ class SocketHandler {
   handleMovePuppet(socket, data) {
     const { puppetId, location, x, z } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit('movement-error', {
@@ -375,13 +411,11 @@ class SocketHandler {
       return;
     }
 
-    // Register player in game state if not already registered
     const existingState = this.gameState.getPlayerState(player.sessionId);
     if (!existingState) {
       this.gameState.registerPlayer(player.sessionId, puppetId, player.nickname);
     }
 
-    // Check if puppet is locked
     const playerState = this.gameState.getPlayerState(player.sessionId);
     if (playerState && playerState.isLocked) {
       socket.emit('movement-error', {
@@ -390,10 +424,7 @@ class SocketHandler {
       return;
     }
 
-    let newPosition;
-
     if (location) {
-      // Move to predefined stage location
       const success = this.gameState.movePlayer(player.sessionId, location);
       if (!success) {
         socket.emit('movement-error', {
@@ -402,7 +433,6 @@ class SocketHandler {
         return;
       }
     } else if (x !== undefined && z !== undefined) {
-      // Move to exact coordinates
       const success = this.gameState.movePlayerTo(player.sessionId, x, z);
       if (!success) {
         socket.emit('movement-error', {
@@ -417,18 +447,15 @@ class SocketHandler {
       return;
     }
 
-    // Get the updated position
     const updatedState = this.gameState.getPlayerState(player.sessionId);
-    newPosition = updatedState ? updatedState.position : { x: 0, y: 0, z: 0 };
+    const newPosition = updatedState ? updatedState.position : { x: 0, y: 0, z: 0 };
 
-    // Broadcast movement to all clients
     this.io.emit(SocketEvents.PUPPET_MOVED, {
       playerId: player.sessionId,
       puppetId,
       position: newPosition,
     });
 
-    // Also send as a state update
     this.io.emit(SocketEvents.STATE_UPDATE, {
       playerId: player.sessionId,
       puppetId,
@@ -450,7 +477,6 @@ class SocketHandler {
   handleSaveAnimation(socket, data) {
     const { animation } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -466,7 +492,6 @@ class SocketHandler {
       return;
     }
 
-    // Store the animation (deep copy to avoid reference issues)
     const stored = JSON.parse(JSON.stringify(animation));
     stored.savedBy = player.nickname;
     stored.savedAt = Date.now();
@@ -474,7 +499,6 @@ class SocketHandler {
 
     console.log(`[SocketHandler] ${player.nickname} saved animation: ${animation.id}`);
 
-    // Broadcast to all clients
     this.io.emit(SocketEvents.ANIMATION_SAVED, {
       animation: stored,
       savedBy: player.nickname,
@@ -489,7 +513,6 @@ class SocketHandler {
   handleLoadAnimation(socket, data) {
     const { animationId } = data || {};
 
-    // Check authentication
     const { authenticated } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -527,7 +550,6 @@ class SocketHandler {
   handleDeleteAnimation(socket, data) {
     const { animationId } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -553,7 +575,6 @@ class SocketHandler {
 
     console.log(`[SocketHandler] ${player.nickname} deleted animation: ${animationId}`);
 
-    // Broadcast to all clients
     this.io.emit(SocketEvents.ANIMATION_DELETED, {
       animationId,
       deletedBy: player.nickname,
@@ -566,7 +587,6 @@ class SocketHandler {
    * @param {object} data
    */
   handleListAnimations(socket, data) {
-    // Check authentication
     const { authenticated } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.ANIMATION_ERROR, {
@@ -592,6 +612,361 @@ class SocketHandler {
   }
 
   // ============================================================
+  // Admin Control Handlers
+  // ============================================================
+
+  /**
+   * Handle admin-move-puppet (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string, location?: string, x?: number, z?: number }} data
+   */
+  handleAdminMovePuppet(socket, data) {
+    const { playerId, location, x, z } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can move puppets.',
+      });
+      return;
+    }
+
+    if (!playerId) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId is required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.forceMovePuppet(playerId, location || null, x, z);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to move puppet.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} moved puppet of ${playerId}`);
+  }
+
+  /**
+   * Handle admin-lock-puppet (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string, lock: boolean }} data
+   */
+  handleAdminLockPuppet(socket, data) {
+    const { playerId, lock } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can lock/unlock puppets.',
+      });
+      return;
+    }
+
+    if (!playerId) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId is required.',
+      });
+      return;
+    }
+
+    const result = lock
+      ? this.adminController.lockPuppet(playerId)
+      : this.adminController.unlockPuppet(playerId);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to lock/unlock puppet.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} ${lock ? 'locked' : 'unlocked'} puppet of ${playerId}`);
+  }
+
+  /**
+   * Handle admin-force-animation (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string, animation: Object }} data
+   */
+  handleAdminForceAnimation(socket, data) {
+    const { playerId, animation } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can force animations.',
+      });
+      return;
+    }
+
+    if (!playerId || !animation) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId and animation are required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.forceAnimation(playerId, animation);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to force animation.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} forced animation on ${playerId}`);
+  }
+
+  /**
+   * Handle admin-stop-animation-puppet (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string }} data
+   */
+  handleAdminStopAnimationPuppet(socket, data) {
+    const { playerId } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can stop animations.',
+      });
+      return;
+    }
+
+    if (!playerId) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId is required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.stopAnimation(playerId);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to stop animation.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} stopped animation on ${playerId}`);
+  }
+
+  /**
+   * Handle admin-eject-player (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string }} data
+   */
+  handleAdminEjectPlayer(socket, data) {
+    const { playerId } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can eject players.',
+      });
+      return;
+    }
+
+    if (!playerId) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId is required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.ejectPlayer(playerId);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to eject player.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} ejected ${playerId}`);
+  }
+
+  /**
+   * Handle admin-change-background (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ background: string }} data
+   */
+  handleAdminChangeBackground(socket, data) {
+    const { background } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can change the background.',
+      });
+      return;
+    }
+
+    const result = this.adminController.changeBackground(background);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to change background.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} changed background to ${background}`);
+  }
+
+  /**
+   * Handle admin-offstage-puppet (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string }} data
+   */
+  handleAdminOffstagePuppet(socket, data) {
+    const { playerId } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can move puppets off-stage.',
+      });
+      return;
+    }
+
+    if (!playerId) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId is required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.moveOffStage(playerId);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to move puppet off-stage.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} moved ${playerId} off-stage`);
+  }
+
+  /**
+   * Handle admin-override-puppet (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ playerId: string, config: Object }} data
+   */
+  handleAdminOverridePuppet(socket, data) {
+    const { playerId, config } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can override puppet configs.',
+      });
+      return;
+    }
+
+    if (!playerId || !config) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'playerId and config are required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.overridePuppetConfig(playerId, config);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to override puppet config.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} overridden puppet config for ${playerId}`);
+  }
+
+  /**
+   * Handle admin-pause-all (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {object} data
+   */
+  handleAdminPauseAll(socket, data) {
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can pause all animations.',
+      });
+      return;
+    }
+
+    const result = this.adminController.pauseAllAnimations();
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} paused all animations (${result.stoppedCount} puppets)`);
+  }
+
+  /**
+   * Handle admin-reset-all (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {object} data
+   */
+  handleAdminResetAll(socket, data) {
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can reset all positions.',
+      });
+      return;
+    }
+
+    const result = this.adminController.resetAllPositions();
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} reset all positions (${result.resetCount} puppets)`);
+  }
+
+  /**
+   * Handle admin-kick-all (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {object} data
+   */
+  handleAdminKickAll(socket, data) {
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can kick all players.',
+      });
+      return;
+    }
+
+    const result = this.adminController.kickAllPlayers();
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} kicked all players (${result.kickedCount} removed)`);
+  }
+
+  /**
+   * Handle admin-get-players (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {object} data
+   */
+  handleAdminGetPlayers(socket, data) {
+    const { authorized } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can get the player list.',
+      });
+      return;
+    }
+
+    const playerList = this.adminController.getPlayerList();
+
+    socket.emit('admin-player-list', { players: playerList });
+  }
+
+  // ============================================================
   // Asset Handlers (existing)
   // ============================================================
 
@@ -603,7 +978,6 @@ class SocketHandler {
   handleUploadAsset(socket, data) {
     const { fileName, data: fileData, category, subGroup } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.UPLOAD_ERROR, {
@@ -612,7 +986,6 @@ class SocketHandler {
       return;
     }
 
-    // Check owner role
     if (!this.authManager.isOwner(player.sessionId)) {
       socket.emit(SocketEvents.UPLOAD_ERROR, {
         message: 'Only the server owner can upload assets.',
@@ -620,7 +993,6 @@ class SocketHandler {
       return;
     }
 
-    // Validate required fields
     if (!fileName || !fileData || !category) {
       socket.emit(SocketEvents.UPLOAD_ERROR, {
         message: 'fileName, data, and category are required.',
@@ -628,7 +1000,6 @@ class SocketHandler {
       return;
     }
 
-    // Decode base64 data
     let buffer;
     try {
       buffer = Buffer.from(fileData, 'base64');
@@ -639,7 +1010,6 @@ class SocketHandler {
       return;
     }
 
-    // Add asset via AssetManager
     const result = this.assetManager.addAsset(fileName, buffer, category, subGroup || null);
 
     if (!result.success) {
@@ -651,7 +1021,6 @@ class SocketHandler {
 
     console.log(`[SocketHandler] ${player.nickname} uploaded asset: ${fileName} to ${category}`);
 
-    // Broadcast to all clients (including uploader) - single emit
     this.io.emit(SocketEvents.ASSET_UPLOADED, {
       success: true,
       assetId: result.assetId,
@@ -671,7 +1040,6 @@ class SocketHandler {
    */
   handleAssetManifest(socket, data) {
     const manifest = this.assetManager.getAssetManifest();
-
     socket.emit(SocketEvents.ASSET_MANIFEST_RESPONSE, manifest);
   }
 
@@ -683,7 +1051,6 @@ class SocketHandler {
   handleDeleteAsset(socket, data) {
     const { assetId, category } = data || {};
 
-    // Check authentication
     const { authenticated, player } = this.getPlayerFromSocket(socket);
     if (!authenticated) {
       socket.emit(SocketEvents.DELETE_ERROR, {
@@ -692,7 +1059,6 @@ class SocketHandler {
       return;
     }
 
-    // Check owner role
     if (!this.authManager.isOwner(player.sessionId)) {
       socket.emit(SocketEvents.DELETE_ERROR, {
         message: 'Only the server owner can delete assets.',
@@ -700,7 +1066,6 @@ class SocketHandler {
       return;
     }
 
-    // Validate required fields
     if (!assetId || !category) {
       socket.emit(SocketEvents.DELETE_ERROR, {
         message: 'assetId and category are required.',
@@ -708,7 +1073,6 @@ class SocketHandler {
       return;
     }
 
-    // Delete asset via AssetManager
     const result = this.assetManager.deleteAsset(assetId, category);
 
     if (!result.success) {
@@ -720,14 +1084,12 @@ class SocketHandler {
 
     console.log(`[SocketHandler] ${player.nickname} deleted asset: ${assetId} from ${category}`);
 
-    // Send success response to requester
     socket.emit(SocketEvents.DELETE_RESULT, {
       success: true,
       assetId,
       category,
     });
 
-    // Broadcast deletion to all clients
     this.io.emit(SocketEvents.ASSET_DELETED, {
       assetId,
       category,

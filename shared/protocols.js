@@ -63,6 +63,12 @@ const SocketEvents = {
   /** Lock/unlock a puppet */
   ADMIN_LOCK_PUPPET: 'admin-lock-puppet',
 
+  /** Force animation on puppet (admin) */
+  ADMIN_FORCE_ANIMATION: 'admin-force-animation',
+
+  /** Stop animation on puppet (admin) */
+  ADMIN_STOP_ANIMATION_PUPPET: 'admin-stop-animation-puppet',
+
   /** Eject player from server */
   ADMIN_EJECT_PLAYER: 'admin-eject-player',
 
@@ -71,6 +77,30 @@ const SocketEvents = {
 
   /** Move puppet off-stage */
   ADMIN_OFFSTAGE_PUPPET: 'admin-offstage-puppet',
+
+  /** Override puppet configuration */
+  ADMIN_OVERRIDE_PUPPET: 'admin-override-puppet',
+
+  /** Pause all animations */
+  ADMIN_PAUSE_ALL: 'admin-pause-all',
+
+  /** Reset all puppet positions */
+  ADMIN_RESET_ALL: 'admin-reset-all',
+
+  /** Kick all players */
+  ADMIN_KICK_ALL: 'admin-kick-all',
+
+  /** Get player list */
+  ADMIN_GET_PLAYERS: 'admin-get-players',
+
+  /** Admin error response */
+  ADMIN_ERROR: 'admin-error',
+
+  /** Background changed broadcast */
+  BACKGROUND_CHANGED: 'background-changed',
+
+  /** Puppet config overridden broadcast */
+  PUPPET_CONFIG_OVERRIDDEN: 'puppet-config-overridden',
 
   // ---- Asset Management ----
   /** Client uploads an asset */

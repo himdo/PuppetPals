@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PuppetPals</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loading-content">
+      <h1 class="loading-title">PuppetPals</h1>
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Loading...</p>
+    </div>
+  </div>
+
+  <!-- Join Screen (hidden by default) -->
+  <div id="join-screen" class="hidden">
+    <div class="join-content">
+      <h1>PuppetPals</h1>
+      <div class="join-form">
+        <div class="form-group">
+          <label for="server-address">Server Address</label>
+          <input type="text" id="server-address" placeholder="Current origin" />
+        </div>
+        <div class="form-group">
+          <label for="nickname">Nickname</label>
+          <input type="text" id="nickname" placeholder="Enter your nickname" minlength="3" maxlength="20" />
+        </div>
+        <div id="join-error" class="error-message hidden"></div>
+        <button id="connect-btn" class="btn btn-primary">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Stage Container (hidden by default) -->
+  <div id="stage-container" class="hidden">
+    <canvas id="stage-canvas"></canvas>
+  </div>
+
+  <!-- UI Overlays (hidden by default) -->
+  <div id="ui-overlay" class="hidden">
+    <!-- Panels will be injected here dynamically -->
+  </div>
+
+  <!-- Client scripts -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

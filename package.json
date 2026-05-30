@@ -1,11 +1,19 @@
 {
   "name": "puppetpals",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Web-based puppet controlling software with real-time synchronized animations",
+  "main": "server/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "test": "node --test test/**/*.test.js"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "uuid": "^9.0.0"
+  }
 }

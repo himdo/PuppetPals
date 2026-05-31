@@ -60,6 +60,8 @@ class GameState {
       puppetConfig: null,
       isLocked: false,
       currentSlotIndex: 2, // Default to first on-screen slot (index 2)
+      facingDirection: 'right', // Default facing direction
+      isTransitioning: false, // Whether currently in a movement transition
     };
   }
 
@@ -318,6 +320,30 @@ class GameState {
       delta.puppetConfig = {
         old: this._deepClone(cachedState.puppetConfig),
         new: this._deepClone(current.puppetConfig),
+      };
+    }
+
+    // Compare currentSlotIndex
+    if (cachedState.currentSlotIndex !== current.currentSlotIndex) {
+      delta.currentSlotIndex = {
+        old: cachedState.currentSlotIndex,
+        new: current.currentSlotIndex,
+      };
+    }
+
+    // Compare facingDirection
+    if (cachedState.facingDirection !== current.facingDirection) {
+      delta.facingDirection = {
+        old: cachedState.facingDirection,
+        new: current.facingDirection,
+      };
+    }
+
+    // Compare isTransitioning
+    if (cachedState.isTransitioning !== current.isTransitioning) {
+      delta.isTransitioning = {
+        old: cachedState.isTransitioning,
+        new: current.isTransitioning,
       };
     }
 
@@ -667,18 +693,30 @@ class GameState {
    */
   setOnScreenSlotCount(count) {
     this.onScreenSlotCount = Math.max(2, Math.min(10, count));
+    // Clamp existing player slot indices to new total
+    if (!this.players) return;
+    const slots = this.getSlotPositions();
+    const maxIndex = slots.length - 1;
+    for (const [playerId, player] of this.players) {
+      if (player.currentSlotIndex > maxIndex) {
+        player.currentSlotIndex = maxIndex;
+      }
+    }
   }
 
   /**
    * Move a player one slot in the given direction with wrap-around
    * @param {string} playerId - The player's session ID
    * @param {'left'|'right'} direction - Movement direction
-   * @returns {Object|false} Move details { playerId, fromIndex, toIndex, direction } or false
+   * @returns {Object|false} Move details { playerId, fromIndex, toIndex, direction } or false if transitioning
    */
   movePlayerDirection(playerId, direction) {
     const player = this.players?.get(playerId);
     if (!player) return false;
     if (direction !== 'left' && direction !== 'right') return false;
+
+    // Block movement if already transitioning
+    if (player.isTransitioning) return false;
 
     const slots = this.getSlotPositions();
     const total = slots.length;
@@ -692,6 +730,8 @@ class GameState {
     }
 
     player.currentSlotIndex = toIndex;
+    player.facingDirection = direction;
+    player.isTransitioning = true;
     const targetSlot = slots[toIndex];
     player.position.x = targetSlot.x;
     player.position.y = targetSlot.y;
@@ -703,6 +743,31 @@ class GameState {
       toIndex,
       direction,
     };
+  }
+
+  /**
+   * Complete a transition for a player (set isTransitioning to false)
+   * @param {string} playerId - The player's session ID
+   * @returns {boolean} True if transition was completed
+   */
+  completeTransition(playerId) {
+    const player = this.players?.get(playerId);
+    if (!player) return false;
+    player.isTransitioning = false;
+    return true;
+  }
+
+  /**
+   * Get the clamped slot index for a player based on current slot count
+   * @param {string} playerId - The player's session ID
+   * @returns {number} Clamped slot index
+   */
+  getClampedSlotIndex(playerId) {
+    const player = this.players?.get(playerId);
+    if (!player) return 0;
+    const slots = this.getSlotPositions();
+    const maxIndex = slots.length - 1;
+    return Math.min(player.currentSlotIndex, maxIndex);
   }
 
   /**

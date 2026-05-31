@@ -95,6 +95,11 @@ class SocketHandler {
         this.handleMovePuppet(socket, data);
       });
 
+      // Handle directional slot movement (Request 21)
+      socket.on(SocketEvents.MOVE_DIRECTION, (data) => {
+        this.handleMoveDirection(socket, data);
+      });
+
       // ---- Admin Control Events ----
       socket.on(SocketEvents.ADMIN_MOVE_PUPPET, (data) => {
         this.handleAdminMovePuppet(socket, data);
@@ -475,6 +480,69 @@ class SocketHandler {
     });
 
     console.log(`[SocketHandler] ${player.nickname} moved ${puppetId} to (${newPosition.x}, ${newPosition.z})`);
+  }
+
+  /**
+   * Handle move-direction request from authenticated user (Request 21)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ direction: 'left'|'right' }} data
+   */
+  handleMoveDirection(socket, data) {
+    const { direction } = data || {};
+
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit('movement-error', {
+        message: 'You must be authenticated to move a puppet.',
+      });
+      return;
+    }
+
+    if (direction !== 'left' && direction !== 'right') {
+      socket.emit('movement-error', {
+        message: 'Direction must be "left" or "right".',
+      });
+      return;
+    }
+
+    const existingState = this.gameState.getPlayerState(player.sessionId);
+    if (!existingState) {
+      socket.emit('movement-error', {
+        message: 'Player state not found.',
+      });
+      return;
+    }
+
+    // Check if player is locked
+    if (existingState.isLocked) {
+      socket.emit('movement-error', {
+        message: 'Your puppet has been locked by the server owner.',
+      });
+      return;
+    }
+
+    // Attempt move (will return false if transitioning)
+    const result = this.gameState.movePlayerDirection(player.sessionId, direction);
+    if (!result) {
+      socket.emit('movement-error', {
+        message: 'Cannot move while transitioning.',
+      });
+      return;
+    }
+
+    const updatedState = this.gameState.getPlayerState(player.sessionId);
+
+    // Broadcast slot-moved to all clients with timestamp for latency compensation
+    this.io.emit(SocketEvents.SLOT_MOVED, {
+      playerId: player.sessionId,
+      puppetId: updatedState.puppetId,
+      fromIndex: result.fromIndex,
+      toIndex: result.toIndex,
+      direction: result.direction,
+      timestamp: Date.now(),
+    });
+
+    console.log(`[SocketHandler] ${player.nickname} moved ${direction} from slot ${result.fromIndex} to ${result.toIndex}`);
   }
 
   // ============================================================

@@ -447,6 +447,121 @@ html, body {
   color: #e94560;
 }
 
+/* ============================================================
+   Movement Bar (Request 19)
+   ============================================================ */
+#movement-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 200;
+  user-select: none;
+}
+
+#movement-bar.hidden {
+  display: none;
+}
+
+.movement-btn {
+  min-width: 100px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.movement-btn:active {
+  transform: scale(0.95);
+}
+
+.movement-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#move-left-btn {
+  background: linear-gradient(135deg, #4a90d9, #357abd);
+}
+
+#move-left-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a9fe9, #4588cd);
+}
+
+#move-right-btn {
+  background: linear-gradient(135deg, #43a047, #2e7d32);
+}
+
+#move-right-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #53b057, #3e8d42);
+}
+
+#move-on-stage-btn {
+  background: linear-gradient(135deg, #e94560, #c62828);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+#move-on-stage-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f95570, #d63838);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(233, 69, 96, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(233, 69, 96, 0.8);
+  }
+}
+
+#slot-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+}
+
+#slot-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #eee;
+}
+
+#slot-position {
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+#slot-position.off-screen {
+  color: #e94560;
+  font-weight: 700;
+  animation: blink-text 1s ease-in-out infinite;
+}
+
+@keyframes blink-text {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 .asset-delete-btn {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;

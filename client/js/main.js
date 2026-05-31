@@ -3,6 +3,7 @@
  */
 
 import SocketClient from './socket-client.js';
+import AppState from './app-state.js';
 import Renderer from './three/renderer.js';
 import Scene from './three/scene.js';
 import Camera from './three/camera.js';
@@ -14,6 +15,12 @@ import AssetBrowser from './assets/asset-browser.js';
 let joinScreen, joinForm, nicknameInput, serverAddressInput, joinError, joinStatus, gameContainer;
 let socketClient;
 let assetBrowser;
+
+// Movement bar elements (Request 19)
+let movementBar, moveLeftBtn, moveRightBtn, moveOnStageBtn, slotLabel, slotPosition;
+
+// Application state
+let appState;
 
 // Three.js components
 let threeRenderer;
@@ -35,6 +42,14 @@ function cacheElements() {
   joinError = document.getElementById('join-error');
   joinStatus = document.getElementById('join-status');
   gameContainer = document.getElementById('game-container');
+
+  // Movement bar elements (Request 19)
+  movementBar = document.getElementById('movement-bar');
+  moveLeftBtn = document.getElementById('move-left-btn');
+  moveRightBtn = document.getElementById('move-right-btn');
+  moveOnStageBtn = document.getElementById('move-on-stage-btn');
+  slotLabel = document.getElementById('slot-label');
+  slotPosition = document.getElementById('slot-position');
 }
 
 /**
@@ -127,6 +142,99 @@ function setupAssetPanelToggle() {
   }
 }
 
+// ============================================================
+// Movement Bar (Request 19)
+// ============================================================
+
+/**
+ * Initialize the movement bar UI
+ */
+function initMovementBar() {
+  if (!movementBar || !moveLeftBtn || !moveRightBtn) return;
+
+  // Show the movement bar
+  movementBar.classList.remove('hidden');
+
+  // Left button handler
+  moveLeftBtn.addEventListener('click', () => {
+    if (window.appState && window.appState.buttonsEnabled) {
+      window.appState.requestMoveDirection('left');
+      updateMovementButtons();
+    }
+  });
+
+  // Right button handler
+  moveRightBtn.addEventListener('click', () => {
+    if (window.appState && window.appState.buttonsEnabled) {
+      window.appState.requestMoveDirection('right');
+      updateMovementButtons();
+    }
+  });
+
+  // Move on-stage button handler
+  if (moveOnStageBtn) {
+    moveOnStageBtn.addEventListener('click', () => {
+      if (window.appState && window.appState.buttonsEnabled) {
+        window.appState.requestMoveOnStage();
+        updateMovementButtons();
+      }
+    });
+  }
+
+  // Listen for state changes to update UI
+  if (window.appState) {
+    window.appState.on('slotMoved', (data) => {
+      if (data.playerId === window.appState.localPlayerId) {
+        updateSlotIndicator(data.toIndex);
+      }
+    });
+  }
+}
+
+/**
+ * Update movement button states based on cooldown
+ */
+function updateMovementButtons() {
+  if (!window.appState) return;
+
+  const enabled = window.appState.buttonsEnabled;
+  if (moveLeftBtn) moveLeftBtn.disabled = !enabled;
+  if (moveRightBtn) moveRightBtn.disabled = !enabled;
+  if (moveOnStageBtn) moveOnStageBtn.disabled = !enabled;
+}
+
+/**
+ * Update the slot indicator display
+ * @param {number} slotIndex - Current slot index
+ */
+function updateSlotIndicator(slotIndex) {
+  if (slotLabel) {
+    slotLabel.textContent = `Slot ${slotIndex}`;
+  }
+
+  if (slotPosition) {
+    const isOffScreen = slotIndex !== null && slotIndex < 2;
+    if (isOffScreen) {
+      slotPosition.textContent = 'OFF-SCREEN';
+      slotPosition.classList.add('off-screen');
+      if (moveOnStageBtn) moveOnStageBtn.classList.remove('hidden');
+    } else {
+      slotPosition.textContent = 'On-Screen';
+      slotPosition.classList.remove('off-screen');
+      if (moveOnStageBtn) moveOnStageBtn.classList.add('hidden');
+    }
+  }
+}
+
+/**
+ * Periodically update movement button states (for cooldown sync)
+ */
+function startMovementButtonSync() {
+  setInterval(() => {
+    updateMovementButtons();
+  }, 100);
+}
+
 /**
  * Update player info display
  */
@@ -157,6 +265,10 @@ function enterGame() {
 
   // Initialize asset browser
   initAssetBrowser();
+
+  // Initialize movement bar (Request 19)
+  initMovementBar();
+  startMovementButtonSync();
 }
 
 /**
@@ -336,6 +448,13 @@ function handleJoinConfirmed(data) {
   window.playerRole = data.role;
   window.nickname = data.nickname;
   window.players = data.players;
+
+  // Initialize app state
+  appState = new AppState();
+  appState.setSocketClient(socketClient);
+  appState.setLocalPlayer(data.sessionId, `puppet-${data.sessionId}`, data.nickname);
+  appState.setupSocketListeners();
+  window.appState = appState;
 
   // Transition to game view
   setTimeout(() => {

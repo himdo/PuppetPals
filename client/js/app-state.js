@@ -19,6 +19,16 @@ class AppState {
 
     /** @type {Object<string, Array<Function>>} Event listeners */
     this._listeners = {};
+
+    // Slot-based movement state (Request 19)
+    /** @type {number} Button cooldown in milliseconds */
+    this.buttonCooldownMs = 500;
+    /** @type {boolean} Whether movement buttons are enabled */
+    this.buttonsEnabled = true;
+    /** @type {number|null} Current slot index for local player */
+    this.currentSlotIndex = null;
+    /** @type {number} Number of on-screen slots */
+    this.onScreenSlotCount = 5;
   }
 
   // ============================================================
@@ -112,6 +122,32 @@ class AppState {
     this.socketClient.on('puppet-moved', (data) => {
       this.applyStateUpdate(data);
       this.emit('puppetMoved', data);
+    });
+
+    // Slot-based movement (Request 19)
+    this.socketClient.on('slot-moved', (data) => {
+      // Update player state with new slot info
+      if (data.playerId && data.toIndex !== undefined) {
+        if (!this.players[data.playerId]) {
+          this.players[data.playerId] = {};
+        }
+        this.players[data.playerId].currentSlotIndex = data.toIndex;
+        this.players[data.playerId].facingDirection = data.direction || this.players[data.playerId].facingDirection;
+
+        // Update local player's slot index
+        if (data.playerId === this.localPlayerId) {
+          this.currentSlotIndex = data.toIndex;
+        }
+      }
+      this.emit('slotMoved', data);
+    });
+
+    // Stage config update (Request 19)
+    this.socketClient.on('stage-config-update', (data) => {
+      if (data.onScreenSlotCount !== undefined) {
+        this.onScreenSlotCount = data.onScreenSlotCount;
+      }
+      this.emit('stageConfigUpdated', data);
     });
   }
 
@@ -227,6 +263,62 @@ class AppState {
       x,
       z,
     });
+  }
+
+  // ============================================================
+  // Direction Movement (Request 19)
+  // ============================================================
+
+  /**
+   * Request to move the local puppet one slot in the given direction
+   * @param {'left'|'right'} direction - Movement direction
+   */
+  requestMoveDirection(direction) {
+    if (!this.socketClient || !this.localPlayerId) return;
+    if (!this.buttonsEnabled) return;
+
+    // Emit move-direction event
+    this.socketClient.emit('move-direction', {
+      direction,
+    });
+
+    // Disable buttons during cooldown
+    this.buttonsEnabled = false;
+    setTimeout(() => {
+      this.buttonsEnabled = true;
+    }, this.buttonCooldownMs);
+  }
+
+  /**
+   * Check if the local puppet is currently off-screen
+   * @returns {boolean} True if off-screen
+   */
+  isOffScreen() {
+    if (this.currentSlotIndex === null) return false;
+    // Off-screen slots are indices 0 and 1
+    return this.currentSlotIndex < 2;
+  }
+
+  /**
+   * Get the nearest on-screen slot index
+   * @returns {number} The nearest on-screen slot index (always 2, the first on-screen slot)
+   */
+  getNearestOnScreenSlot() {
+    if (this.currentSlotIndex === null) return 2;
+    // If already on-screen, return current
+    if (this.currentSlotIndex >= 2) return this.currentSlotIndex;
+    // Off-screen slots (0, 1) - nearest on-screen is always slot 2
+    return 2;
+  }
+
+  /**
+   * Request to move the puppet to the nearest on-screen slot
+   * Emits move-direction events as needed
+   */
+  requestMoveOnStage() {
+    if (!this.isOffScreen()) return;
+    // Move right to get on-screen (off-screen slots are to the left)
+    this.requestMoveDirection('right');
   }
 
   // ============================================================

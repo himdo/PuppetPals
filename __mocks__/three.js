@@ -171,6 +171,12 @@ class MockMeshLambertMaterial {
   }
 }
 
+class MockCanvasTexture {
+  constructor(canvas) {
+    this.canvas = canvas;
+  }
+}
+
 class MockMesh extends MockObject3D {
   constructor(geometry, material) {
     super();
@@ -215,6 +221,7 @@ const MockTHREE = {
   Euler: MockEuler,
   OrbitControls: MockOrbitControls,
   Color: function(hex) { this.hex = hex; },
+  CanvasTexture: MockCanvasTexture,
   DoubleSide,
 };
 

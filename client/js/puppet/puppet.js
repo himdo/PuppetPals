@@ -66,8 +66,118 @@ class Puppet {
     this.onMovementEnd = null;   // Callback when movement completes
     this._previousAnimation = null; // Stored animation before walk
 
+    // Trail effect state (Request 22)
+    this.trailEnabled = false;
+    this.trailSprites = [];
+    this._lastTrailPosition = { x: 0, y: 0 };
+    this._trailTimer = 0;
+
+    // Location label state (Request 22)
+    this.locationLabelVisible = false;
+    this.locationLabel = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.01, 0.01),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    this.locationLabel.name = 'Off-Screen';
+    this.locationLabel.visible = false;
+    this.locationLabel.position.set(0, 2.6, 0);
+
     // Mesh loader for creating placeholder meshes
     this.meshLoader = new MeshLoader();
+
+    // Add location label to group
+    this.group.add(this.locationLabel);
+  }
+
+  /**
+   * Enable or disable the movement trail effect
+   * @param {boolean} enabled - Whether trail effect is enabled
+   */
+  setTrailEnabled(enabled) {
+    this.trailEnabled = enabled;
+    if (!enabled) {
+      this.clearTrail();
+    }
+  }
+
+  /**
+   * Update trail sprites during transition
+   * @param {number} deltaTime - Time since last frame in seconds
+   * @private
+   */
+  _updateTrail(deltaTime) {
+    if (!this.trailEnabled || !this.isMoving || !this.group) return;
+
+    const currentX = this.group.position.x;
+    const currentY = this.group.position.y;
+    this._trailTimer += deltaTime;
+
+    // Add trail sprite every ~40ms during movement
+    if (this._trailTimer > 0.04) {
+      this._trailTimer = 0;
+
+      // Create fading ghost trail sprite
+      const trailGeo = new THREE.PlaneGeometry(1, 1);
+      const trailMat = new THREE.MeshBasicMaterial({
+        color: 0x888888,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        depthTest: false,
+      });
+      const trailSprite = new THREE.Mesh(trailGeo, trailMat);
+      trailSprite.position.set(
+        this._lastTrailPosition.x,
+        this._lastTrailPosition.y,
+        -0.5
+      );
+      this.group.add(trailSprite);
+      this.trailSprites.push(trailSprite);
+
+      // Limit trail length
+      while (this.trailSprites.length > 8) {
+        const old = this.trailSprites.shift();
+        this.group.remove(old);
+      }
+
+      // Fade existing trail sprites
+      this.trailSprites.forEach(sprite => {
+        if (sprite.material.opacity > 0.02) {
+          sprite.material.opacity *= 0.85;
+        }
+      });
+
+      this._lastTrailPosition.x = currentX;
+      this._lastTrailPosition.y = currentY;
+    }
+  }
+
+  /**
+   * Clear all trail sprites
+   */
+  clearTrail() {
+    this.trailSprites.forEach(sprite => {
+      this.group.remove(sprite);
+    });
+    this.trailSprites = [];
+    this._trailTimer = 0;
+  }
+
+  /**
+   * Show or hide the location label above the puppet
+   * @param {boolean} visible - Whether the label should be visible
+   */
+  setLocationLabelVisible(visible) {
+    this.locationLabelVisible = visible;
+    this.locationLabel.visible = visible;
+  }
+
+  /**
+   * Update the location label text
+   * @param {string} text - The location text to display
+   */
+  updateLocationLabel(text) {
+    this.locationLabel.name = text;
   }
 
   /**

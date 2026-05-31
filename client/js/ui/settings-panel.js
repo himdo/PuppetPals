@@ -12,6 +12,31 @@ class SettingsPanel {
     showGrid: true,
     autoSave: true,
     theme: 'light',
+    // Stage polish settings (Request 22)
+    transitionSpeed: 'normal',
+    wiggleIntensity: 'medium',
+    showSlotMarkers: true,
+    showLocationLabels: false,
+    autoPlayWalkAnimation: true,
+  };
+
+  /**
+   * Transition duration in ms per speed setting
+   */
+  static TRANSITION_DURATIONS = {
+    fast: 200,
+    normal: 400,
+    slow: 800,
+  };
+
+  /**
+   * Wiggle configuration per intensity setting
+   */
+  static WIGGLE_CONFIGS = {
+    none: { frequency: 0, amplitude: 0 },
+    low: { frequency: 2, amplitude: 3 },
+    medium: { frequency: 3, amplitude: 5 },
+    high: { frequency: 5, amplitude: 10 },
   };
 
   /**
@@ -97,6 +122,24 @@ class SettingsPanel {
   }
 
   /**
+   * Get transition duration in ms based on current transitionSpeed setting
+   * @returns {number} Duration in milliseconds
+   */
+  getTransitionDuration() {
+    const speed = this.settings.transitionSpeed || 'normal';
+    return SettingsPanel.TRANSITION_DURATIONS[speed] || 400;
+  }
+
+  /**
+   * Get wiggle configuration based on current wiggleIntensity setting
+   * @returns {{frequency: number, amplitude: number}} Wiggle config
+   */
+  getWiggleConfig() {
+    const intensity = this.settings.wiggleIntensity || 'medium';
+    return { ...SettingsPanel.WIGGLE_CONFIGS[intensity] } || { frequency: 3, amplitude: 5 };
+  }
+
+  /**
    * Remove all socket listeners and clean up
    */
   cleanup() {
@@ -144,6 +187,49 @@ class SettingsPanel {
           </select>
         </label>
       </div>
+
+      <h3>Stage Visuals</h3>
+
+      <div class="setting-group">
+        <label>
+          Transition Speed:
+          <select id="setting-transition-speed">
+            <option value="fast" ${this.settings.transitionSpeed === 'fast' ? 'selected' : ''}>Fast</option>
+            <option value="normal" ${this.settings.transitionSpeed === 'normal' ? 'selected' : ''}>Normal</option>
+            <option value="slow" ${this.settings.transitionSpeed === 'slow' ? 'selected' : ''}>Slow</option>
+          </select>
+        </label>
+      </div>
+      <div class="setting-group">
+        <label>
+          Wiggle Intensity:
+          <select id="setting-wiggle-intensity">
+            <option value="none" ${this.settings.wiggleIntensity === 'none' ? 'selected' : ''}>None</option>
+            <option value="low" ${this.settings.wiggleIntensity === 'low' ? 'selected' : ''}>Low</option>
+            <option value="medium" ${this.settings.wiggleIntensity === 'medium' ? 'selected' : ''}>Medium</option>
+            <option value="high" ${this.settings.wiggleIntensity === 'high' ? 'selected' : ''}>High</option>
+          </select>
+        </label>
+      </div>
+      <div class="setting-group">
+        <label>
+          <input type="checkbox" id="setting-show-slot-markers" ${this.settings.showSlotMarkers ? 'checked' : ''} />
+          Show Slot Markers
+        </label>
+      </div>
+      <div class="setting-group">
+        <label>
+          <input type="checkbox" id="setting-show-location-labels" ${this.settings.showLocationLabels ? 'checked' : ''} />
+          Show Location Labels
+        </label>
+      </div>
+      <div class="setting-group">
+        <label>
+          <input type="checkbox" id="setting-auto-play-walk" ${this.settings.autoPlayWalkAnimation ? 'checked' : ''} />
+          Auto-Play Walk Animation
+        </label>
+      </div>
+
       <button id="reset-settings-btn" class="btn-secondary">Reset to Defaults</button>
     `;
   }

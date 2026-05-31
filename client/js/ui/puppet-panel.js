@@ -16,7 +16,17 @@ class PuppetPanel {
     this.selectedPuppet = null;
     /** @type {Function|null} Callback for opening puppet editor */
     this.editorCallback = null;
+    /** @type {string} Preview view mode ('2d' or '3d') */
+    this.previewView = '2d';
     this.panelElement = null;
+  }
+
+  /**
+   * Set the preview view mode for puppet display
+   * @param {string} view - View mode ('2d' or '3d')
+   */
+  setPreviewView(view) {
+    this.previewView = view === '3d' ? '3d' : '2d';
   }
 
   /**
@@ -154,7 +164,7 @@ class PuppetPanel {
       puppetItem.setAttribute('data-puppet-id', puppet.id);
 
       puppetItem.innerHTML = `
-        <div class="puppet-thumbnail">
+        <div class="puppet-thumbnail puppet-preview-${this.previewView}">
           <img src="/assets/puppets/${puppet.thumbnail || 'placeholder.png'}" alt="${puppet.name}" />
         </div>
         <div class="puppet-name">${puppet.name}</div>

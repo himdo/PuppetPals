@@ -24,6 +24,15 @@ const SocketEvents = {
   /** Server broadcasts puppet movement */
   PUPPET_MOVED: 'puppet-moved',
 
+  /** Client requests directional slot movement (left/right) */
+  MOVE_DIRECTION: 'move-direction',
+
+  /** Server broadcasts slot movement result */
+  SLOT_MOVED: 'slot-moved',
+
+  /** Server broadcasts stage config update (e.g., on-screen slot count change) */
+  STAGE_CONFIG_UPDATE: 'stage-config-update',
+
   // ---- Animations ----
   /** Owner requests animation playback */
   START_ANIMATION: 'start-animation',

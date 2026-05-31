@@ -60,4 +60,16 @@ describe('SocketEvents', () => {
   it('should have ASSET_DELETED event', () => {
     expect(SocketEvents).toHaveProperty('ASSET_DELETED');
   });
+
+  it('should have MOVE_DIRECTION event', () => {
+    expect(SocketEvents).toHaveProperty('MOVE_DIRECTION');
+  });
+
+  it('should have SLOT_MOVED event', () => {
+    expect(SocketEvents).toHaveProperty('SLOT_MOVED');
+  });
+
+  it('should have STAGE_CONFIG_UPDATE event', () => {
+    expect(SocketEvents).toHaveProperty('STAGE_CONFIG_UPDATE');
+  });
 });

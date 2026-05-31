@@ -20,6 +20,11 @@ class GameState {
     this._maxPingHistory = 10;
     // Animation time tracking for drift correction
     this._animationTimes = new Map();
+    // Slot-based stage positioning
+    this.onScreenSlotCount = 5;
+    this._stageWidth = 16;
+    this._stageHeight = 9;
+    this._puppetWidth = 2;
   }
 
   /**
@@ -54,6 +59,7 @@ class GameState {
       currentAnimation: null,
       puppetConfig: null,
       isLocked: false,
+      currentSlotIndex: 2, // Default to first on-screen slot (index 2)
     };
   }
 
@@ -572,6 +578,139 @@ class GameState {
       return config;
     }
     return this.getDefaultPuppetConfig();
+  }
+
+  // ============================================================
+  // Slot-Based Stage Positioning
+  // ============================================================
+
+  /**
+   * Calculate all slot positions based on current onScreenSlotCount
+   * @returns {Array} Array of location objects
+   */
+  _calculateSlotPositions() {
+    const locations = [];
+    const floorY = -this._stageHeight * 0.35;
+
+    // Off-screen slots (indices 0 and 1)
+    locations.push({
+      id: 'offscreen-far-left',
+      x: -this._stageWidth / 2 - this._puppetWidth * 1.5,
+      y: floorY,
+      z: 0,
+      isOffScreen: true,
+      label: 'Off-screen (far left)',
+    });
+
+    locations.push({
+      id: 'offscreen-left',
+      x: -this._stageWidth / 2 - this._puppetWidth * 0.5,
+      y: floorY,
+      z: 0,
+      isOffScreen: true,
+      label: 'Off-screen (left)',
+    });
+
+    // On-screen slots (indices 2+)
+    const slotWidth = this._stageWidth / this.onScreenSlotCount;
+    for (let i = 0; i < this.onScreenSlotCount; i++) {
+      const x = -this._stageWidth / 2 + slotWidth * (i + 0.5);
+      locations.push({
+        id: `slot-${i}`,
+        x,
+        y: floorY,
+        z: 0,
+        isOffScreen: false,
+        label: `Slot ${i}`,
+      });
+    }
+
+    return locations;
+  }
+
+  /**
+   * Get calculated slot positions for current onScreenSlotCount
+   * @returns {Array} Array of location objects
+   */
+  getSlotPositions() {
+    return this._calculateSlotPositions();
+  }
+
+  /**
+   * Get current slot index for a player
+   * @param {string} playerId - The player's session ID
+   * @returns {number} Current slot index, -1 if player not found
+   */
+  getPlayerSlotIndex(playerId) {
+    const player = this.players?.get(playerId);
+    if (!player) return -1;
+    return player.currentSlotIndex;
+  }
+
+  /**
+   * Set number of on-screen slots (admin-controlled)
+   * @param {number} count - New on-screen slot count (clamped to 2-10)
+   */
+  setOnScreenSlotCount(count) {
+    this.onScreenSlotCount = Math.max(2, Math.min(10, count));
+  }
+
+  /**
+   * Move a player one slot in the given direction with wrap-around
+   * @param {string} playerId - The player's session ID
+   * @param {'left'|'right'} direction - Movement direction
+   * @returns {Object|false} Move details { playerId, fromIndex, toIndex, direction } or false
+   */
+  movePlayerDirection(playerId, direction) {
+    const player = this.players?.get(playerId);
+    if (!player) return false;
+    if (direction !== 'left' && direction !== 'right') return false;
+
+    const slots = this.getSlotPositions();
+    const total = slots.length;
+    const fromIndex = player.currentSlotIndex;
+
+    let toIndex;
+    if (direction === 'right') {
+      toIndex = (fromIndex + 1) % total;
+    } else {
+      toIndex = (fromIndex - 1 + total) % total;
+    }
+
+    player.currentSlotIndex = toIndex;
+    const targetSlot = slots[toIndex];
+    player.position.x = targetSlot.x;
+    player.position.y = targetSlot.y;
+    player.position.z = targetSlot.z;
+
+    return {
+      playerId,
+      fromIndex,
+      toIndex,
+      direction,
+    };
+  }
+
+  /**
+   * Move a player to a specific slot index
+   * @param {string} playerId - The player's session ID
+   * @param {number} slotIndex - The target slot index
+   * @returns {boolean} True if moved successfully
+   */
+  movePlayerToSlot(playerId, slotIndex) {
+    const player = this.players?.get(playerId);
+    if (!player) return false;
+
+    const slots = this.getSlotPositions();
+    if (slotIndex < 0 || slotIndex >= slots.length) return false;
+
+    player.currentSlotIndex = slotIndex;
+    const targetSlot = slots[slotIndex];
+    player.position.x = targetSlot.x;
+    player.position.y = targetSlot.y;
+    player.position.z = targetSlot.z;
+
+    return true;
   }
 }
 

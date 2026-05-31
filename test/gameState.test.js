@@ -351,3 +351,171 @@ describe('GameState default stage locations', () => {
     expect(locations.stageRight.x).toBeGreaterThan(0);
   });
 });
+
+describe('GameState slot-based positioning', () => {
+  it('should have default onScreenSlotCount of 5', () => {
+    const state = new GameState();
+    expect(state.onScreenSlotCount).toBe(5);
+  });
+
+  it('should set currentSlotIndex on player registration', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    const playerState = state.getPlayerState('player-1');
+    expect(playerState.currentSlotIndex).toBe(2); // Default to first on-screen slot
+  });
+
+  it('should have getPlayerSlotIndex method', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    expect(state.getPlayerSlotIndex('player-1')).toBe(2);
+  });
+
+  it('should return -1 for non-existent player slot index', () => {
+    const state = new GameState();
+    expect(state.getPlayerSlotIndex('nonexistent')).toBe(-1);
+  });
+
+  it('should have setOnScreenSlotCount method', () => {
+    const state = new GameState();
+    state.setOnScreenSlotCount(3);
+    expect(state.onScreenSlotCount).toBe(3);
+  });
+
+  it('should clamp onScreenSlotCount to minimum of 2', () => {
+    const state = new GameState();
+    state.setOnScreenSlotCount(1);
+    expect(state.onScreenSlotCount).toBe(2);
+  });
+
+  it('should clamp onScreenSlotCount to maximum of 10', () => {
+    const state = new GameState();
+    state.setOnScreenSlotCount(15);
+    expect(state.onScreenSlotCount).toBe(10);
+  });
+
+  it('should have getSlotPositions method', () => {
+    const state = new GameState();
+    const positions = state.getSlotPositions();
+    expect(Array.isArray(positions)).toBe(true);
+    expect(positions.length).toBe(7); // 2 off-screen + 5 on-screen
+  });
+
+  it('should update slot positions when onScreenSlotCount changes', () => {
+    const state = new GameState();
+    state.setOnScreenSlotCount(3);
+    const positions = state.getSlotPositions();
+    expect(positions.length).toBe(5); // 2 off-screen + 3 on-screen
+  });
+});
+
+describe('GameState movePlayerDirection', () => {
+  it('should move player one slot to the right', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    expect(state.getPlayerSlotIndex('player-1')).toBe(2);
+
+    const result = state.movePlayerDirection('player-1', 'right');
+    expect(result).toBeTruthy();
+    expect(state.getPlayerSlotIndex('player-1')).toBe(3);
+  });
+
+  it('should move player one slot to the left', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    expect(state.getPlayerSlotIndex('player-1')).toBe(2);
+
+    const result = state.movePlayerDirection('player-1', 'left');
+    expect(result).toBeTruthy();
+    expect(state.getPlayerSlotIndex('player-1')).toBe(1);
+  });
+
+  it('should wrap from last slot to first when moving right', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    state.movePlayerToSlot('player-1', 6); // Last slot (slot-4)
+
+    const result = state.movePlayerDirection('player-1', 'right');
+    expect(result).toBeTruthy();
+    expect(state.getPlayerSlotIndex('player-1')).toBe(0); // Wraps to offscreen-far-left
+  });
+
+  it('should wrap from first slot to last when moving left', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    state.movePlayerToSlot('player-1', 0); // First slot (offscreen-far-left)
+
+    const result = state.movePlayerDirection('player-1', 'left');
+    expect(result).toBeTruthy();
+    expect(state.getPlayerSlotIndex('player-1')).toBe(6); // Wraps to slot-4
+  });
+
+  it('should return false for non-existent player', () => {
+    const state = new GameState();
+    const result = state.movePlayerDirection('nonexistent', 'right');
+    expect(result).toBe(false);
+  });
+
+  it('should return false for invalid direction', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    const result = state.movePlayerDirection('player-1', 'up');
+    expect(result).toBe(false);
+  });
+
+  it('should return move details with fromIndex and toIndex', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+
+    const result = state.movePlayerDirection('player-1', 'right');
+    expect(result.fromIndex).toBe(2);
+    expect(result.toIndex).toBe(3);
+    expect(result.direction).toBe('right');
+  });
+
+  it('should update player position to match slot coordinates', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+
+    state.movePlayerDirection('player-1', 'right');
+    const playerState = state.getPlayerState('player-1');
+    const slotPositions = state.getSlotPositions();
+    const targetSlot = slotPositions[3];
+    expect(playerState.position.x).toBeCloseTo(targetSlot.x, 5);
+  });
+});
+
+describe('GameState movePlayerToSlot', () => {
+  it('should move player to a specific slot index', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+
+    const result = state.movePlayerToSlot('player-1', 4);
+    expect(result).toBe(true);
+    expect(state.getPlayerSlotIndex('player-1')).toBe(4);
+  });
+
+  it('should return false for non-existent player', () => {
+    const state = new GameState();
+    const result = state.movePlayerToSlot('nonexistent', 4);
+    expect(result).toBe(false);
+  });
+
+  it('should return false for invalid slot index', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+    const result = state.movePlayerToSlot('player-1', 100);
+    expect(result).toBe(false);
+  });
+
+  it('should update player position to match slot coordinates', () => {
+    const state = new GameState();
+    state.registerPlayer('player-1', 'puppet-1');
+
+    state.movePlayerToSlot('player-1', 0);
+    const playerState = state.getPlayerState('player-1');
+    const slotPositions = state.getSlotPositions();
+    const targetSlot = slotPositions[0];
+    expect(playerState.position.x).toBeCloseTo(targetSlot.x, 5);
+  });
+});

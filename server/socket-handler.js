@@ -143,6 +143,18 @@ class SocketHandler {
       socket.on(SocketEvents.ADMIN_GET_PLAYERS, (data) => {
         this.handleAdminGetPlayers(socket, data);
       });
+
+      socket.on(SocketEvents.ADMIN_SET_SLOT_COUNT, (data) => {
+        this.handleAdminSetSlotCount(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_MOVE_DIRECTION, (data) => {
+        this.handleAdminMoveDirection(socket, data);
+      });
+
+      socket.on(SocketEvents.ADMIN_MOVE_TO_SLOT, (data) => {
+        this.handleAdminMoveToSlot(socket, data);
+      });
     });
   }
 
@@ -964,6 +976,104 @@ class SocketHandler {
     const playerList = this.adminController.getPlayerList();
 
     socket.emit('admin-player-list', { players: playerList });
+  }
+
+  /**
+   * Handle admin-set-slot-count (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ count: number }} data
+   */
+  handleAdminSetSlotCount(socket, data) {
+    const { count } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can change slot count.',
+      });
+      return;
+    }
+
+    const result = this.adminController.setOnScreenSlotCount(count);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to set slot count.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} set slot count to ${count}`);
+  }
+
+  /**
+   * Handle admin-move-direction (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ targetPlayerId: string, direction: string }} data
+   */
+  handleAdminMoveDirection(socket, data) {
+    const { targetPlayerId, direction } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can move puppets.',
+      });
+      return;
+    }
+
+    if (!targetPlayerId || !direction) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'targetPlayerId and direction are required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.movePuppetDirection(targetPlayerId, direction);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to move puppet.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} moved ${targetPlayerId} ${direction}`);
+  }
+
+  /**
+   * Handle admin-move-to-slot (owner only)
+   * @param {import('socket.io').Socket} socket
+   * @param {{ targetPlayerId: string, slotIndex: number }} data
+   */
+  handleAdminMoveToSlot(socket, data) {
+    const { targetPlayerId, slotIndex } = data || {};
+
+    const { authorized, player } = this.adminController.verifyOwner(socket);
+    if (!authorized) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Only the server owner can move puppets.',
+      });
+      return;
+    }
+
+    if (!targetPlayerId || slotIndex === undefined) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'targetPlayerId and slotIndex are required.',
+      });
+      return;
+    }
+
+    const result = this.adminController.movePuppetToSlot(targetPlayerId, slotIndex);
+
+    if (!result.success) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: result.error || 'Failed to move puppet to slot.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ADMIN ${player.nickname} moved ${targetPlayerId} to slot ${slotIndex}`);
   }
 
   // ============================================================

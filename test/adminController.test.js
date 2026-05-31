@@ -30,8 +30,11 @@ function createMockAuthManager(isOwner = true) {
 function createMockGameState() {
   const state = {};
   return {
-    getPlayerState: (playerId) => state[playerId] || null,
-    getAllPlayerStates: () => ({ ...state }),
+    getPlayerState: (playerId) => {
+      if (!state[playerId]) return null;
+      return JSON.parse(JSON.stringify(state[playerId]));
+    },
+    getAllPlayerStates: () => JSON.parse(JSON.stringify(state)),
     movePlayer: (playerId, location) => {
       if (!state[playerId]) return false;
       const locations = { center: { x: 0, z: 0 }, stageLeft: { x: -5, z: 0 } };
@@ -77,6 +80,11 @@ function createMockGameState() {
     }),
     _setState: (playerId, data) => { state[playerId] = data; },
     _getState: () => state,
+    _rawSet: (playerId, key, value) => {
+      if (!state[playerId]) return false;
+      state[playerId][key] = value;
+      return true;
+    },
   };
 }
 
@@ -946,5 +954,399 @@ describe('AdminController getOffStagePosition', () => {
     expect(pos.x).toBe(999);
     expect(pos.y).toBe(0);
     expect(pos.z).toBe(0);
+  });
+});
+
+// ============================================================
+// setOnScreenSlotCount - admin changes on-screen slot count
+// ============================================================
+describe('AdminController setOnScreenSlotCount', () => {
+  it('should set the on-screen slot count to a valid value', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 2,
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.setOnScreenSlotCount(7);
+
+    expect(result.success).toBe(true);
+    expect(admin.onScreenSlotCount).toBe(7);
+  });
+
+  it('should clamp slot count to minimum of 2', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.setOnScreenSlotCount(1);
+
+    expect(admin.onScreenSlotCount).toBe(2);
+  });
+
+  it('should clamp slot count to maximum of 10', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.setOnScreenSlotCount(15);
+
+    expect(admin.onScreenSlotCount).toBe(10);
+  });
+
+  it('should broadcast stage-config-update to all clients', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.setOnScreenSlotCount(6);
+
+    const logs = io.getBroadcastLogs();
+    const configLog = logs.find(l => l.event === 'stage-config-update');
+    expect(configLog).toBeTruthy();
+    expect(configLog.data.onScreenSlotCount).toBe(6);
+  });
+
+  it('should clamp player slot indices that exceed new total', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 6,
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.setOnScreenSlotCount(3);
+
+    const state = game.getPlayerState('session-target');
+    expect(state.currentSlotIndex).toBeLessThan(5);
+  });
+
+  it('should return failure for invalid count', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.setOnScreenSlotCount(null);
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================
+// movePuppetDirection - admin moves puppet left or right
+// ============================================================
+describe('AdminController movePuppetDirection', () => {
+  it('should move a puppet one slot to the right', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetDirection('session-target', 'right');
+
+    expect(result.success).toBe(true);
+    const state = game.getPlayerState('session-target');
+    expect(state.currentSlotIndex).toBe(4);
+  });
+
+  it('should move a puppet one slot to the left', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetDirection('session-target', 'left');
+
+    expect(result.success).toBe(true);
+    const state = game.getPlayerState('session-target');
+    expect(state.currentSlotIndex).toBe(2);
+  });
+
+  it('should return failure for non-existent player', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetDirection('nonexistent', 'right');
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should return failure for invalid direction', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetDirection('session-target', 'up');
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should broadcast slot-moved to all clients', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.movePuppetDirection('session-target', 'right');
+
+    const logs = io.getBroadcastLogs();
+    const log = logs.find(l => l.event === 'slot-moved');
+    expect(log).toBeTruthy();
+    expect(log.data.playerId).toBe('session-target');
+    expect(log.data.toIndex).toBe(4);
+  });
+
+  it('should update facing direction when moving', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.movePuppetDirection('session-target', 'left');
+
+    const state = game.getPlayerState('session-target');
+    expect(state.facingDirection).toBe('left');
+  });
+});
+
+// ============================================================
+// movePuppetToSlot - admin moves puppet to exact slot index
+// ============================================================
+describe('AdminController movePuppetToSlot', () => {
+  it('should move a puppet to a specific slot index', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 2,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetToSlot('session-target', 5);
+
+    expect(result.success).toBe(true);
+    const state = game.getPlayerState('session-target');
+    expect(state.currentSlotIndex).toBe(5);
+  });
+
+  it('should return failure for non-existent player', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetToSlot('nonexistent', 3);
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should return failure for invalid slot index', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 2,
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetToSlot('session-target', -1);
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should return failure for slot index exceeding total', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 2,
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const result = admin.movePuppetToSlot('session-target', 100);
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should broadcast slot-moved to all clients', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 2,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.movePuppetToSlot('session-target', 5);
+
+    const logs = io.getBroadcastLogs();
+    const log = logs.find(l => l.event === 'slot-moved');
+    expect(log).toBeTruthy();
+    expect(log.data.fromIndex).toBe(2);
+    expect(log.data.toIndex).toBe(5);
+  });
+
+  it('should include timestamp in slot-moved broadcast', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 2,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    admin.movePuppetToSlot('session-target', 4);
+
+    const logs = io.getBroadcastLogs();
+    const log = logs.find(l => l.event === 'slot-moved');
+    expect(log.data.timestamp).toBeTruthy();
+    expect(typeof log.data.timestamp).toBe('number');
+  });
+});
+
+// ============================================================
+// getPuppetSlotInfo - get slot info for a puppet
+// ============================================================
+describe('AdminController getPuppetSlotInfo', () => {
+  it('should return slot info for a player', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const info = admin.getPuppetSlotInfo('session-target');
+
+    expect(info.success).toBe(true);
+    expect(info.slotIndex).toBe(3);
+    expect(info.playerId).toBe('session-target');
+  });
+
+  it('should return failure for non-existent player', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const info = admin.getPuppetSlotInfo('nonexistent');
+
+    expect(info.success).toBe(false);
+  });
+
+  it('should include isOnScreen based on slot index', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 3,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const info = admin.getPuppetSlotInfo('session-target');
+
+    expect(info.isOnScreen).toBe(true);
+  });
+
+  it('should mark puppet as off-screen when slot index is off-screen', () => {
+    const auth = createMockAuthManager(true);
+    const game = createMockGameState();
+    game._setState('session-target', {
+      playerId: 'session-target',
+      puppetId: 'puppet-1',
+      currentSlotIndex: 0,
+      nickname: 'Player1',
+    });
+    const anim = createMockAnimationSync();
+    const io = createMockIO();
+
+    const admin = new AdminController(io, auth, game, anim);
+    const info = admin.getPuppetSlotInfo('session-target');
+
+    expect(info.isOnScreen).toBe(false);
   });
 });

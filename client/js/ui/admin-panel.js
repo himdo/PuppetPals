@@ -13,6 +13,7 @@ class AdminPanel {
     this.isVisible = false;
     this.currentBackground = 'default';
     this.panelElement = null;
+    this.onScreenSlotCount = 5; // Default on-screen slot count
   }
 
   /**
@@ -38,6 +39,23 @@ class AdminPanel {
     // Listen for background changes
     this.socket.on('background-changed', (data) => {
       this.currentBackground = data.background;
+    });
+
+    // Listen for stage config updates (slot count changes)
+    this.socket.on('stage-config-update', (data) => {
+      if (data.onScreenSlotCount !== undefined) {
+        this.onScreenSlotCount = data.onScreenSlotCount;
+      }
+      this._renderPlayerList();
+    });
+
+    // Listen for slot movement updates
+    this.socket.on('slot-moved', (data) => {
+      const player = this.playerList.find(p => p.sessionId === data.playerId);
+      if (player) {
+        player.currentSlotIndex = data.toIndex;
+      }
+      this._renderPlayerList();
     });
   }
 
@@ -202,12 +220,92 @@ class AdminPanel {
   }
 
   /**
+   * Set the number of on-screen slots
+   * @param {number} count - Number of on-screen slots (clamped to 2-10)
+   */
+  setOnScreenSlotCount(count) {
+    const clamped = Math.max(2, Math.min(10, count));
+    this.onScreenSlotCount = clamped;
+    this.socket.emit('admin-set-slot-count', { count: clamped });
+  }
+
+  /**
+   * Move a puppet one slot left or right
+   * @param {string} playerId - The target player's session ID
+   * @param {'left'|'right'} direction - Movement direction
+   */
+  movePuppetDirection(playerId, direction) {
+    this.socket.emit('admin-move-direction', {
+      targetPlayerId: playerId,
+      direction,
+    });
+  }
+
+  /**
+   * Move a puppet to a specific slot index
+   * @param {string} playerId - The target player's session ID
+   * @param {number} slotIndex - The target slot index
+   */
+  movePuppetToSlot(playerId, slotIndex) {
+    this.socket.emit('admin-move-to-slot', {
+      targetPlayerId: playerId,
+      slotIndex,
+    });
+  }
+
+  /**
+   * Get a human-readable label for a slot index
+   * @param {number} slotIndex - The slot index
+   * @returns {string} Human-readable slot label
+   */
+  getSlotLabel(slotIndex) {
+    if (slotIndex === 0) return 'Off-screen (far left)';
+    if (slotIndex === 1) return 'Off-screen (left)';
+
+    // On-screen slots start at index 2
+    const onScreenIndex = slotIndex - 2;
+    const totalOnScreen = this.onScreenSlotCount;
+
+    // Check if this is the center slot
+    if (totalOnScreen % 2 === 1 && onScreenIndex === Math.floor(totalOnScreen / 2)) {
+      return `Slot ${onScreenIndex + 1} - Center`;
+    }
+
+    return `Slot ${onScreenIndex + 1}`;
+  }
+
+  /**
+   * Get all slot options for dropdown menus
+   * @returns {Array<{value: string, label: string}>} Slot options
+   */
+  getSlotOptions() {
+    const options = [];
+
+    // Off-screen slots
+    options.push({ value: '0', label: 'Off-screen (far left)' });
+    options.push({ value: '1', label: 'Off-screen (left)' });
+
+    // On-screen slots
+    for (let i = 0; i < this.onScreenSlotCount; i++) {
+      const slotIndex = i + 2;
+      options.push({
+        value: String(slotIndex),
+        label: this.getSlotLabel(slotIndex),
+      });
+    }
+
+    return options;
+  }
+
+  /**
    * Remove all socket listeners and clean up
    */
   cleanup() {
     this.socket.off('admin-player-list');
     this.socket.off('state-update');
     this.socket.off('background-changed');
+    this.socket.off('stage-config-update');
+    this.socket.off('slot-moved');
     this.hide();
     this.playerList = [];
   }

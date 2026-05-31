@@ -240,6 +240,20 @@ class GameState {
     return this.players;
   }
 
+  /**
+   * Set a raw property on a player's state directly (bypasses deep clone)
+   * @param {string} playerId - The player's session ID
+   * @param {string} key - The property key to set
+   * @param {*} value - The value to set
+   * @returns {boolean} True if set successfully
+   */
+  _rawSet(playerId, key, value) {
+    const player = this.players?.get(playerId);
+    if (!player) return false;
+    player[key] = value;
+    return true;
+  }
+
   // ============================================================
   // State Delta Updates
   // ============================================================

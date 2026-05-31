@@ -16,6 +16,7 @@ class AdminController {
     this.gameState = gameState;
     this.animationSync = animationSync;
     this.currentBackground = 'default';
+    this.onScreenSlotCount = 5; // Default on-screen slot count
   }
 
   /**
@@ -434,6 +435,154 @@ class AdminController {
    */
   getOffStagePosition() {
     return { x: 999, y: 0, z: 0 };
+  }
+
+  /**
+   * Set the number of on-screen slots and broadcast the change
+   * @param {number} count - Number of on-screen slots (clamped to 2-10)
+   * @returns {{ success: boolean, error?: string }}
+   */
+  setOnScreenSlotCount(count) {
+    if (count === null || count === undefined || typeof count !== 'number' || isNaN(count)) {
+      return { success: false, error: 'Invalid slot count.' };
+    }
+
+    const clampedCount = Math.max(2, Math.min(10, count));
+    this.onScreenSlotCount = clampedCount;
+    const totalSlots = clampedCount + 2; // 2 off-screen slots
+
+    // Clamp any player slot indices that exceed the new total
+    const allStates = this.gameState.getAllPlayerStates();
+    for (const [playerId, state] of Object.entries(allStates)) {
+      if (state.currentSlotIndex >= totalSlots) {
+        state.currentSlotIndex = totalSlots - 1;
+        this.gameState._rawSet(playerId, 'currentSlotIndex', state.currentSlotIndex);
+      }
+    }
+
+    // Broadcast new config to all clients
+    this.io.emit('stage-config-update', {
+      onScreenSlotCount: clampedCount,
+      totalSlots,
+      timestamp: Date.now(),
+    });
+
+    console.log(`[AdminController] Set on-screen slot count to ${clampedCount}`);
+
+    return { success: true };
+  }
+
+  /**
+   * Move a specific puppet one slot left or right
+   * @param {string} playerId - The target player's session ID
+   * @param {'left'|'right'} direction - Movement direction
+   * @returns {{ success: boolean, error?: string }}
+   */
+  movePuppetDirection(playerId, direction) {
+    const playerState = this.gameState.getPlayerState(playerId);
+    if (!playerState) {
+      return { success: false, error: 'Player not found.' };
+    }
+
+    if (direction !== 'left' && direction !== 'right') {
+      return { success: false, error: 'Direction must be "left" or "right".' };
+    }
+
+    const totalSlots = this.onScreenSlotCount + 2; // 2 off-screen slots
+    const fromIndex = playerState.currentSlotIndex;
+    let toIndex;
+
+    if (direction === 'right') {
+      toIndex = (fromIndex + 1) % totalSlots;
+    } else {
+      toIndex = (fromIndex - 1 + totalSlots) % totalSlots;
+    }
+
+    // Update player state
+    this.gameState._rawSet(playerId, 'currentSlotIndex', toIndex);
+    this.gameState._rawSet(playerId, 'facingDirection', direction);
+
+    // Broadcast slot movement to all clients
+    this.io.emit('slot-moved', {
+      playerId,
+      puppetId: playerState.puppetId,
+      fromIndex,
+      toIndex,
+      direction,
+      timestamp: Date.now(),
+    });
+
+    console.log(`[AdminController] Moved ${playerId} ${direction} from slot ${fromIndex} to ${toIndex}`);
+
+    return { success: true };
+  }
+
+  /**
+   * Move a specific puppet to an exact slot index
+   * @param {string} playerId - The target player's session ID
+   * @param {number} slotIndex - The target slot index
+   * @returns {{ success: boolean, error?: string }}
+   */
+  movePuppetToSlot(playerId, slotIndex) {
+    const playerState = this.gameState.getPlayerState(playerId);
+    if (!playerState) {
+      return { success: false, error: 'Player not found.' };
+    }
+
+    const totalSlots = this.onScreenSlotCount + 2; // 2 off-screen slots
+
+    if (typeof slotIndex !== 'number' || slotIndex < 0 || slotIndex >= totalSlots) {
+      return { success: false, error: `Slot index must be between 0 and ${totalSlots - 1}.` };
+    }
+
+    const fromIndex = playerState.currentSlotIndex;
+
+    // Update player state
+    this.gameState._rawSet(playerId, 'currentSlotIndex', slotIndex);
+
+    // Determine facing direction based on movement
+    const direction = slotIndex > fromIndex ? 'right' : slotIndex < fromIndex ? 'left' : undefined;
+    if (direction) {
+      this.gameState._rawSet(playerId, 'facingDirection', direction);
+    }
+
+    // Broadcast slot movement to all clients
+    this.io.emit('slot-moved', {
+      playerId,
+      puppetId: playerState.puppetId,
+      fromIndex,
+      toIndex: slotIndex,
+      direction,
+      timestamp: Date.now(),
+    });
+
+    console.log(`[AdminController] Moved ${playerId} to slot ${slotIndex}`);
+
+    return { success: true };
+  }
+
+  /**
+   * Get slot info for a puppet
+   * @param {string} playerId - The target player's session ID
+   * @returns {{ success: boolean, slotIndex?: number, playerId?: string, isOnScreen?: boolean, error?: string }}
+   */
+  getPuppetSlotInfo(playerId) {
+    const playerState = this.gameState.getPlayerState(playerId);
+    if (!playerState) {
+      return { success: false, error: 'Player not found.' };
+    }
+
+    const slotIndex = playerState.currentSlotIndex;
+    // Off-screen slots are indices 0 and 1
+    const isOnScreen = slotIndex >= 2;
+
+    return {
+      success: true,
+      playerId,
+      slotIndex,
+      isOnScreen,
+      facingDirection: playerState.facingDirection,
+    };
   }
 }
 

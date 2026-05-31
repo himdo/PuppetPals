@@ -102,6 +102,15 @@ const SocketEvents = {
   /** Get player list */
   ADMIN_GET_PLAYERS: 'admin-get-players',
 
+  /** Admin sets number of on-screen slots */
+  ADMIN_SET_SLOT_COUNT: 'admin-set-slot-count',
+
+  /** Admin moves a puppet direction (left/right) */
+  ADMIN_MOVE_DIRECTION: 'admin-move-direction',
+
+  /** Admin moves a puppet to a specific slot index */
+  ADMIN_MOVE_TO_SLOT: 'admin-move-to-slot',
+
   /** Admin error response */
   ADMIN_ERROR: 'admin-error',
 

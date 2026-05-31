@@ -489,6 +489,196 @@ describe('AdminPanel getStageLocations', () => {
 });
 
 // ============================================================
+// AdminPanel slot management methods
+// ============================================================
+describe('AdminPanel setOnScreenSlotCount', () => {
+  it('should emit admin-set-slot-count with the count', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.setOnScreenSlotCount(7);
+
+    const emitted = socket.getEmitted();
+    const evt = emitted.find(e => e.event === 'admin-set-slot-count');
+    expect(evt).toBeTruthy();
+    expect(evt.data.count).toBe(7);
+  });
+
+  it('should clamp count to minimum of 2', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.setOnScreenSlotCount(1);
+
+    const emitted = socket.getEmitted();
+    const evt = emitted.find(e => e.event === 'admin-set-slot-count');
+    expect(evt.data.count).toBe(2);
+  });
+
+  it('should clamp count to maximum of 10', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.setOnScreenSlotCount(15);
+
+    const emitted = socket.getEmitted();
+    const evt = emitted.find(e => e.event === 'admin-set-slot-count');
+    expect(evt.data.count).toBe(10);
+  });
+});
+
+describe('AdminPanel movePuppetDirection', () => {
+  it('should emit admin-move-direction with targetPlayerId and direction', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.movePuppetDirection('session-target', 'right');
+
+    const emitted = socket.getEmitted();
+    const evt = emitted.find(e => e.event === 'admin-move-direction');
+    expect(evt).toBeTruthy();
+    expect(evt.data.targetPlayerId).toBe('session-target');
+    expect(evt.data.direction).toBe('right');
+  });
+
+  it('should emit admin-move-direction for left direction', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.movePuppetDirection('session-target', 'left');
+
+    const emitted = socket.getEmitted();
+    const evt = emitted.find(e => e.event === 'admin-move-direction');
+    expect(evt.data.direction).toBe('left');
+  });
+});
+
+describe('AdminPanel movePuppetToSlot', () => {
+  it('should emit admin-move-to-slot with targetPlayerId and slotIndex', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.movePuppetToSlot('session-target', 5);
+
+    const emitted = socket.getEmitted();
+    const evt = emitted.find(e => e.event === 'admin-move-to-slot');
+    expect(evt).toBeTruthy();
+    expect(evt.data.targetPlayerId).toBe('session-target');
+    expect(evt.data.slotIndex).toBe(5);
+  });
+});
+
+describe('AdminPanel getSlotLabel', () => {
+  it('should return "Off-screen (far left)" for slot index 0', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    const label = admin.getSlotLabel(0);
+    expect(label).toBe('Off-screen (far left)');
+  });
+
+  it('should return "Off-screen (left)" for slot index 1', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    const label = admin.getSlotLabel(1);
+    expect(label).toBe('Off-screen (left)');
+  });
+
+  it('should return a slot label for on-screen slots', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.onScreenSlotCount = 5;
+    const label = admin.getSlotLabel(2);
+    expect(label).toBeTruthy();
+    expect(label).toContain('Slot');
+  });
+
+  it('should return "Center" label for the center slot when onScreenSlotCount is odd', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.onScreenSlotCount = 5;
+    // With 5 on-screen slots, center is at index 2 (onScreenIndex=2, slotIndex=4)
+    const label = admin.getSlotLabel(4);
+    expect(label).toContain('Center');
+  });
+});
+
+describe('AdminPanel getSlotOptions', () => {
+  it('should return all slot options including off-screen', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.onScreenSlotCount = 5;
+    const options = admin.getSlotOptions();
+
+    expect(options.length).toBe(7); // 2 off-screen + 5 on-screen
+  });
+
+  it('should include off-screen options', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.onScreenSlotCount = 5;
+    const options = admin.getSlotOptions();
+
+    const offscreenFarLeft = options.find(o => o.value === '0');
+    expect(offscreenFarLeft).toBeTruthy();
+    expect(offscreenFarLeft.label).toContain('Off-screen');
+  });
+
+  it('should have correct number of options for different slot counts', () => {
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.onScreenSlotCount = 3;
+    const options = admin.getSlotOptions();
+
+    expect(options.length).toBe(5); // 2 off-screen + 3 on-screen
+  });
+});
+
+describe('AdminPanel handleStageConfigUpdate', () => {
+  it('should update onScreenSlotCount on stage-config-update event', () => {
+    const mockDOM = createMockDOM();
+    global.document = {
+      getElementById: mockDOM.getElementById.bind(mockDOM),
+      createElement: mockDOM.createElement.bind(mockDOM),
+    };
+
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.initializeEventListeners();
+
+    socket.triggerEvent('stage-config-update', {
+      onScreenSlotCount: 7,
+      totalSlots: 9,
+    });
+
+    expect(admin.onScreenSlotCount).toBe(7);
+
+    delete global.document;
+  });
+});
+
+describe('AdminPanel handleSlotMoved', () => {
+  it('should update player slot index on slot-moved event', () => {
+    const mockDOM = createMockDOM();
+    global.document = {
+      getElementById: mockDOM.getElementById.bind(mockDOM),
+      createElement: mockDOM.createElement.bind(mockDOM),
+    };
+
+    const socket = createMockSocket();
+    const admin = new AdminPanel(socket);
+    admin.initializeEventListeners();
+
+    admin.playerList = [
+      { sessionId: 's1', nickname: 'Admin', role: 'owner', currentSlotIndex: 2 },
+      { sessionId: 's2', nickname: 'Player1', role: 'client', currentSlotIndex: 3 },
+    ];
+
+    socket.triggerEvent('slot-moved', {
+      playerId: 's2',
+      toIndex: 5,
+    });
+
+    expect(admin.playerList[1].currentSlotIndex).toBe(5);
+
+    delete global.document;
+  });
+});
+
+// ============================================================
 // AdminPanel cleanup
 // ============================================================
 describe('AdminPanel cleanup', () => {

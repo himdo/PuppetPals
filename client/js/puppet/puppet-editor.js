@@ -106,47 +106,114 @@ class PuppetEditor {
   }
 
   // =====================
+  // Helper: Resolve bone from optional boneId or selection
+  // =====================
+
+  /**
+   * Get bone by ID, or fall back to currently selected bone
+   * @param {string} [boneId] - Optional bone ID
+   * @returns {Bone|null}
+   */
+  _resolveBone(boneId) {
+    if (boneId && this.skeleton) return this.skeleton.getBone(boneId);
+    return this.getSelectedBone();
+  }
+
+  /**
+   * Parse setter args that support both old API (value) and new API (boneId, value)
+   * @param {string|number} arg1 - boneId (new) or value (old)
+   * @param {number} [arg2] - value (new API only)
+   * @returns {{ boneId: string|null, value: number }}
+   */
+  _parseSetterArgs(arg1, arg2) {
+    if (typeof arg1 === 'string') {
+      // New API: setBonePositionX(boneId, value)
+      return { boneId: arg1, value: arg2 };
+    } else {
+      // Old API: setBonePositionX(value)
+      return { boneId: null, value: arg1 };
+    }
+  }
+
+  /**
+   * Parse object setter args: old API (obj) vs new API (boneId, obj)
+   * @param {string|Object} arg1 - boneId (new) or object (old)
+   * @param {Object} [arg2] - object (new API only)
+   * @returns {{ boneId: string|null, value: Object }}
+   */
+  _parseObjectSetterArgs(arg1, arg2) {
+    if (typeof arg1 === 'string') {
+      return { boneId: arg1, value: arg2 };
+    } else {
+      return { boneId: null, value: arg1 };
+    }
+  }
+
+  // =====================
   // Position Manipulation
   // =====================
 
   /**
-   * Set the X component of the selected bone's position
-   * @param {number} value - The X position value
+   * Get the position of a bone
+   * @param {string} [boneId] - Optional bone ID (defaults to selected)
+   * @returns {Object|null} Position {x, y, z} or null
    */
-  setBonePositionX(value) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.position.x = value;
+  getBonePosition(boneId) {
+    const bone = this._resolveBone(boneId);
+    if (!bone) return null;
+    return { x: bone.position.x, y: bone.position.y, z: bone.position.z };
   }
 
   /**
-   * Set the Y component of the selected bone's position
-   * @param {number} value - The Y position value
+   * Set the X component of a bone's position
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The X position value (required if boneId provided)
+   * @deprecated Use setBonePositionX(boneId, value) instead
    */
-  setBonePositionY(value) {
-    const bone = this.getSelectedBone();
+  setBonePositionX(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
     if (!bone) return;
-    bone.position.y = value;
+    bone.position.x = parsed.value;
   }
 
   /**
-   * Set the Z component of the selected bone's position
-   * @param {number} value - The Z position value
+   * Set the Y component of a bone's position
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The Y position value (required if boneId provided)
+   * @deprecated Use setBonePositionY(boneId, value) instead
    */
-  setBonePositionZ(value) {
-    const bone = this.getSelectedBone();
+  setBonePositionY(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
     if (!bone) return;
-    bone.position.z = value;
+    bone.position.y = parsed.value;
   }
 
   /**
-   * Set the full position of the selected bone
-   * @param {Object} pos - Position object {x, y, z}
+   * Set the Z component of a bone's position
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The Z position value (required if boneId provided)
+   * @deprecated Use setBonePositionZ(boneId, value) instead
    */
-  setBonePosition(pos) {
-    const bone = this.getSelectedBone();
+  setBonePositionZ(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
     if (!bone) return;
-    bone.position.set(pos.x || 0, pos.y || 0, pos.z || 0);
+    bone.position.z = parsed.value;
+  }
+
+  /**
+   * Set the full position of a bone
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {Object} [pos] - Position object {x, y, z} (required if boneId provided)
+   * @deprecated Use setBonePosition(boneId, pos) instead
+   */
+  setBonePosition(boneId, pos) {
+    const parsed = this._parseObjectSetterArgs(boneId, pos);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.position.set(parsed.value.x || 0, parsed.value.y || 0, parsed.value.z || 0);
   }
 
   // =====================
@@ -154,23 +221,81 @@ class PuppetEditor {
   // =====================
 
   /**
-   * Set the Z-axis rotation of the selected bone (2D-style rotation)
-   * @param {number} angle - Rotation angle in radians
+   * Get the rotation of a bone
+   * When called without boneId, returns Z rotation in radians (backward compat)
+   * When called with boneId, returns {x, y, z} in degrees
+   * @param {string} [boneId] - Optional bone ID (defaults to selected)
+   * @returns {number|Object|null} Rotation value or null
    */
-  setBoneRotation(angle) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.rotation.z = angle;
+  getBoneRotation(boneId) {
+    const bone = this._resolveBone(boneId);
+    if (!bone) return null;
+    // Backward compat: when no boneId provided, return Z rotation in radians
+    if (boneId === undefined || boneId === null) {
+      return bone.rotation.z;
+    }
+    // New API: return all axes in degrees
+    return {
+      x: bone.rotation.x * (180 / Math.PI),
+      y: bone.rotation.y * (180 / Math.PI),
+      z: bone.rotation.z * (180 / Math.PI),
+    };
   }
 
   /**
-   * Get the current Z-axis rotation of the selected bone
-   * @returns {number|null} The rotation angle in radians, or null
+   * Set the Z-axis rotation of the selected bone (radians, backward compat)
+   * Also supports new API: setBoneRotation(boneId, angleInDegrees)
+   * @param {string|number} [boneIdOrAngle] - boneId (new) or angle in radians (old)
+   * @param {number} [angle] - Rotation angle in degrees (new API only)
    */
-  getBoneRotation() {
-    const bone = this.getSelectedBone();
-    if (!bone) return null;
-    return bone.rotation.z;
+  setBoneRotation(boneIdOrAngle, angle) {
+    if (typeof boneIdOrAngle === 'string') {
+      // New API: setBoneRotation(boneId, angleInDegrees)
+      const bone = this._resolveBone(boneIdOrAngle);
+      if (!bone) return;
+      bone.rotation.z = angle * (Math.PI / 180);
+    } else {
+      // Old API: setBoneRotation(angleInRadians)
+      const bone = this.getSelectedBone();
+      if (!bone) return;
+      bone.rotation.z = boneIdOrAngle;
+    }
+  }
+
+  /**
+   * Set the X-axis rotation of a bone (degrees)
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [angle] - Rotation angle in degrees (required if boneId provided)
+   */
+  setBoneRotationX(boneId, angle) {
+    const parsed = this._parseSetterArgs(boneId, angle);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.rotation.x = parsed.value * (Math.PI / 180);
+  }
+
+  /**
+   * Set the Y-axis rotation of a bone (degrees)
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [angle] - Rotation angle in degrees (required if boneId provided)
+   */
+  setBoneRotationY(boneId, angle) {
+    const parsed = this._parseSetterArgs(boneId, angle);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.rotation.y = parsed.value * (Math.PI / 180);
+  }
+
+  /**
+   * Set the Z-axis rotation of a bone (degrees)
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [angle] - Rotation angle in degrees (required if boneId provided)
+   */
+  setBoneRotationZ(boneId, angle) {
+    const parsed = this._parseSetterArgs(boneId, angle);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.rotation.z = parsed.value * (Math.PI / 180);
   }
 
   // =====================
@@ -178,47 +303,12 @@ class PuppetEditor {
   // =====================
 
   /**
-   * Set the X component of the selected bone's scale
-   * @param {number} value - The X scale value (must be > 0)
+   * Get the scale of a bone
+   * @param {string} [boneId] - Optional bone ID (defaults to selected)
+   * @returns {Object|null} Scale {x, y, z} or null
    */
-  setBoneScaleX(value) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    if (value <= 0) return;
-    bone.scale.x = value;
-  }
-
-  /**
-   * Set the Y component of the selected bone's scale
-   * @param {number} value - The Y scale value (must be > 0)
-   */
-  setBoneScaleY(value) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    if (value <= 0) return;
-    bone.scale.y = value;
-  }
-
-  /**
-   * Set the full scale of the selected bone
-   * @param {Object} scale - Scale object {x, y, z}, values must be > 0
-   */
-  setBoneScale(scale) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.scale.set(
-      scale.x > 0 ? scale.x : bone.scale.x,
-      scale.y > 0 ? scale.y : bone.scale.y,
-      scale.z > 0 ? scale.z : bone.scale.z
-    );
-  }
-
-  /**
-   * Get the current scale of the selected bone
-   * @returns {Object|null} Scale object {x, y, z}, or null
-   */
-  getBoneScale() {
-    const bone = this.getSelectedBone();
+  getBoneScale(boneId) {
+    const bone = this._resolveBone(boneId);
     if (!bone) return null;
     return {
       x: bone.scale.x,
@@ -227,47 +317,59 @@ class PuppetEditor {
     };
   }
 
+  /**
+   * Set the X component of a bone's scale
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The X scale value (must be > 0, required if boneId provided)
+   */
+  setBoneScaleX(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    if (parsed.value <= 0) return;
+    bone.scale.x = parsed.value;
+  }
+
+  /**
+   * Set the Y component of a bone's scale
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The Y scale value (must be > 0, required if boneId provided)
+   */
+  setBoneScaleY(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    if (parsed.value <= 0) return;
+    bone.scale.y = parsed.value;
+  }
+
+  /**
+   * Set the full scale of a bone
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {Object} [scale] - Scale object {x, y}, values must be > 0 (required if boneId provided)
+   */
+  setBoneScale(boneId, scale) {
+    const parsed = this._parseObjectSetterArgs(boneId, scale);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.scale.set(
+      parsed.value.x > 0 ? parsed.value.x : bone.scale.x,
+      parsed.value.y > 0 ? parsed.value.y : bone.scale.y,
+      bone.scale.z
+    );
+  }
+
   // =====================
   // Socket Offset Manipulation
   // =====================
 
   /**
-   * Set the X component of the selected bone's socket offset
-   * @param {number} value - The X offset value
+   * Get the socket offset of a bone
+   * @param {string} [boneId] - Optional bone ID (defaults to selected)
+   * @returns {Object|null} Offset {x, y} or null
    */
-  setSocketOffsetX(value) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.socketOffset.x = value;
-  }
-
-  /**
-   * Set the Y component of the selected bone's socket offset
-   * @param {number} value - The Y offset value
-   */
-  setSocketOffsetY(value) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.socketOffset.y = value;
-  }
-
-  /**
-   * Set both components of the selected bone's socket offset
-   * @param {Object} offset - Offset object {x, y}
-   */
-  setSocketOffset(offset) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.socketOffset.x = offset.x ?? bone.socketOffset.x;
-    bone.socketOffset.y = offset.y ?? bone.socketOffset.y;
-  }
-
-  /**
-   * Get the current socket offset of the selected bone
-   * @returns {Object|null} Offset object {x, y}, or null
-   */
-  getSocketOffset() {
-    const bone = this.getSelectedBone();
+  getSocketOffset(boneId) {
+    const bone = this._resolveBone(boneId);
     if (!bone) return null;
     return {
       x: bone.socketOffset.x,
@@ -275,28 +377,73 @@ class PuppetEditor {
     };
   }
 
+  /**
+   * Set the X component of a bone's socket offset
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The X offset value (required if boneId provided)
+   */
+  setSocketOffsetX(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.socketOffset.x = parsed.value;
+  }
+
+  /**
+   * Set the Y component of a bone's socket offset
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The Y offset value (required if boneId provided)
+   */
+  setSocketOffsetY(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.socketOffset.y = parsed.value;
+  }
+
+  /**
+   * Set both components of a bone's socket offset
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {Object} [offset] - Offset object {x, y} (required if boneId provided)
+   */
+  setSocketOffset(boneId, offset) {
+    const parsed = this._parseObjectSetterArgs(boneId, offset);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+    bone.socketOffset.x = parsed.value.x ?? bone.socketOffset.x;
+    bone.socketOffset.y = parsed.value.y ?? bone.socketOffset.y;
+  }
+
   // =====================
   // Asset Manipulation
   // =====================
 
   /**
-   * Change the asset (PNG filename) of the selected bone
-   * @param {string|null} asset - The new asset filename, or null to clear
+   * Get the current asset of a bone
+   * @param {string} [boneId] - Optional bone ID (defaults to selected)
+   * @returns {string|null} The asset filename, or null
    */
-  setBoneAsset(asset) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-    bone.asset = asset;
+  getBoneAsset(boneId) {
+    const bone = this._resolveBone(boneId);
+    if (!bone) return null;
+    return bone.asset;
   }
 
   /**
-   * Get the current asset of the selected bone
-   * @returns {string|null} The asset filename, or null
+   * Change the asset (PNG filename) of a bone
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {string|null} [asset] - The new asset filename, or null to clear (required if boneId provided)
    */
-  getBoneAsset() {
-    const bone = this.getSelectedBone();
-    if (!bone) return null;
-    return bone.asset;
+  setBoneAsset(boneId, asset) {
+    // Old API: setBoneAsset(asset)
+    if (arguments.length === 1) {
+      asset = boneId;
+      boneId = null;
+    }
+
+    const bone = this._resolveBone(boneId);
+    if (!bone) return;
+    bone.asset = asset;
   }
 
   // =====================
@@ -304,31 +451,34 @@ class PuppetEditor {
   // =====================
 
   /**
-   * Set the Z-depth of the selected bone for 2D layer control
-   * Clamps value to range [-10, 10]
-   * @param {number} value - The Z-depth value (-10 to 10)
+   * Get the current Z-depth of a bone
+   * @param {string} [boneId] - Optional bone ID (defaults to selected)
+   * @returns {number|null} The Z-depth value, or null
    */
-  setBoneZDepth(value) {
-    const bone = this.getSelectedBone();
-    if (!bone) return;
-
-    // Validate: must be a number (Infinity/NaN handled by clamping)
-    if (typeof value !== 'number') return;
-    if (Number.isNaN(value)) return;
-
-    // Clamp to allowed range (Infinity will be clamped to max/min)
-    const clamped = Math.max(this.Z_DEPTH_MIN, Math.min(this.Z_DEPTH_MAX, value));
-    bone.zDepth = clamped;
+  getBoneZDepth(boneId) {
+    const bone = this._resolveBone(boneId);
+    if (!bone) return null;
+    return bone.zDepth;
   }
 
   /**
-   * Get the current Z-depth of the selected bone
-   * @returns {number|null} The Z-depth value, or null if no bone selected
+   * Set the Z-depth of a bone for 2D layer control
+   * Clamps value to range [-10, 10]
+   * @param {string} [boneId] - The bone ID (optional, defaults to selected)
+   * @param {number} [value] - The Z-depth value (-10 to 10, required if boneId provided)
    */
-  getBoneZDepth() {
-    const bone = this.getSelectedBone();
-    if (!bone) return null;
-    return bone.zDepth;
+  setBoneZDepth(boneId, value) {
+    const parsed = this._parseSetterArgs(boneId, value);
+    const bone = this._resolveBone(parsed.boneId);
+    if (!bone) return;
+
+    // Validate: must be a number (Infinity/NaN handled by clamping)
+    if (typeof parsed.value !== 'number') return;
+    if (Number.isNaN(parsed.value)) return;
+
+    // Clamp to allowed range (Infinity will be clamped to max/min)
+    const clamped = Math.max(this.Z_DEPTH_MIN, Math.min(this.Z_DEPTH_MAX, parsed.value));
+    bone.zDepth = clamped;
   }
 
   // =====================

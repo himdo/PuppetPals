@@ -160,6 +160,23 @@ class SocketHandler {
       socket.on(SocketEvents.ADMIN_MOVE_TO_SLOT, (data) => {
         this.handleAdminMoveToSlot(socket, data);
       });
+
+      // ---- Puppet Editor Events ----
+      socket.on(SocketEvents.PUPPET_UPDATED, (data) => {
+        this.handlePuppetUpdated(socket, data);
+      });
+
+      socket.on('request-puppet-list', (data) => {
+        this.handleRequestPuppetList(socket, data);
+      });
+
+      socket.on('select-puppet', (data) => {
+        this.handleSelectPuppet(socket, data);
+      });
+
+      socket.on('save-puppet', (data) => {
+        this.handleSavePuppet(socket, data);
+      });
     });
   }
 
@@ -1272,6 +1289,130 @@ class SocketHandler {
       assetId,
       category,
       deletedBy: player.nickname,
+    });
+  }
+
+  // ============================================================
+  // Puppet Editor Handlers
+  // ============================================================
+
+  /**
+   * Handle puppet-updated: client sends updated skeleton config
+   * @param {import('socket.io').Socket} socket
+   * @param {Object} data - The updated skeleton configuration
+   */
+  handlePuppetUpdated(socket, data) {
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'You must be authenticated to update puppets.',
+      });
+      return;
+    }
+
+    if (!data || !data.bones) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Invalid puppet configuration.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ${player.nickname} updated puppet config (${data.bones.length} bones)`);
+
+    // Broadcast the updated config to all clients
+    this.io.emit(SocketEvents.SYNC_PUPPET, {
+      sessionId: player.sessionId,
+      nickname: player.nickname,
+      config: data,
+    });
+  }
+
+  /**
+   * Handle request-puppet-list: client requests available puppets
+   * @param {import('socket.io').Socket} socket
+   * @param {Object} data
+   */
+  handleRequestPuppetList(socket, data) {
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+    if (!authenticated) {
+      return;
+    }
+
+    // Get available puppets from asset manager
+    const puppets = this.assetManager.getAvailablePuppets();
+
+    console.log(`[SocketHandler] ${player.nickname} requested puppet list (${puppets.length} available)`);
+
+    socket.emit('puppet-list', {
+      puppets: puppets || [],
+    });
+  }
+
+  /**
+   * Handle select-puppet: client selects a puppet to use
+   * @param {import('socket.io').Socket} socket
+   * @param {{ puppetId: string }} data
+   */
+  handleSelectPuppet(socket, data) {
+    const { puppetId } = data || {};
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+
+    if (!authenticated) {
+      return;
+    }
+
+    if (!puppetId) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'puppetId is required.',
+      });
+      return;
+    }
+
+    // Update player's puppet in game state
+    if (this.gameState) {
+      this.gameState.setPlayerPuppet(player.sessionId, puppetId);
+    }
+
+    console.log(`[SocketHandler] ${player.nickname} selected puppet: ${puppetId}`);
+
+    // Notify all clients
+    this.io.emit(SocketEvents.STATE_UPDATE, {
+      playerId: player.sessionId,
+      nickname: player.nickname,
+      puppetId: puppetId,
+    });
+  }
+
+  /**
+   * Handle save-puppet: client saves a custom puppet configuration
+   * @param {import('socket.io').Socket} socket
+   * @param {{ config: Object }} data
+   */
+  handleSavePuppet(socket, data) {
+    const { config } = data || {};
+    const { authenticated, player } = this.getPlayerFromSocket(socket);
+
+    if (!authenticated) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'You must be authenticated to save puppets.',
+      });
+      return;
+    }
+
+    if (!config || !config.name) {
+      socket.emit(SocketEvents.ADMIN_ERROR, {
+        message: 'Puppet config with a name is required.',
+      });
+      return;
+    }
+
+    console.log(`[SocketHandler] ${player.nickname} saved puppet: ${config.name}`);
+
+    // Broadcast the saved puppet config to all clients
+    this.io.emit(SocketEvents.SYNC_PUPPET, {
+      sessionId: player.sessionId,
+      nickname: player.nickname,
+      config: config,
     });
   }
 }

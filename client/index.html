@@ -59,6 +59,8 @@
       <!-- Top Bar -->
       <div id="top-bar">
         <button id="toggle-asset-panel" class="btn btn-small">Assets</button>
+        <button id="open-editor-btn" class="btn btn-small" title="Bone Editor">🔧 Bones</button>
+        <button id="open-visual-editor-btn" class="btn btn-small" title="Visual Puppet Builder">🎨 Visual Builder</button>
         <span id="player-info" class="player-info"></span>
       </div>
       <!-- Panels will be injected here dynamically -->
@@ -73,6 +75,53 @@
       </div>
       <button id="move-right-btn" class="movement-btn" title="Move Right">RIGHT ►</button>
       <button id="move-on-stage-btn" class="movement-btn hidden" title="Move On-Stage">On-Stage</button>
+    </div>
+
+    <!-- Puppet Builder Button moved to top bar -->
+  </div>
+
+  <!-- Puppet Editor Overlay (fullscreen modal) -->
+  <div id="puppet-editor-overlay" class="puppet-editor-overlay">
+    <div class="puppet-editor-container">
+      <div class="puppet-editor-header">
+        <h2>Puppet Builder</h2>
+        <div class="puppet-editor-header-actions">
+          <button id="editor-close-btn" class="btn btn-secondary" title="Close Editor">✕</button>
+        </div>
+      </div>
+      <div class="puppet-editor-body">
+        <div class="puppet-editor-bone-list">
+          <h3>Bones</h3>
+          <div id="editor-bone-list"></div>
+        </div>
+        <div class="puppet-editor-properties" id="editor-properties">
+          <div class="puppet-editor-no-selection">Select a bone to edit its properties</div>
+        </div>
+      </div>
+      <div class="puppet-editor-footer">
+        <div class="puppet-editor-footer-left">
+          <button id="editor-reset-btn" class="btn btn-secondary" title="Reset Changes">Reset</button>
+          <button id="editor-sort-y-btn" class="btn btn-secondary" title="Auto-sort Z by Y position">Sort Z by Y</button>
+          <span id="editor-changes-indicator" class="changes-indicator saved"><span class="dot"></span> Saved</span>
+        </div>
+        <div class="puppet-editor-footer-right">
+          <button id="editor-export-btn" class="btn btn-secondary" title="Export JSON">Export JSON</button>
+          <button id="editor-apply-btn" class="btn btn-primary" title="Apply Changes">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visual Editor Overlay (drag-and-drop puppet builder) -->
+  <div id="visual-editor-overlay" class="visual-editor-overlay">
+    <div class="visual-editor-container">
+      <div class="visual-editor-header">
+        <h2>Visual Puppet Builder</h2>
+        <div class="visual-editor-header-actions">
+          <button id="ve-close-btn" class="btn btn-secondary" title="Close Builder">✕</button>
+        </div>
+      </div>
+      <div class="visual-editor-body" id="visual-editor-container"></div>
     </div>
   </div>
 

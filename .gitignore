@@ -42,6 +42,6 @@ coverage/
 server_output.txt
 
 # Uploaded assets (optional - uncomment if assets should not be tracked)
-# assets/puppets/
-# assets/backgrounds/
-# assets/animations/
+assets/puppets/
+assets/backgrounds/
+assets/animations/

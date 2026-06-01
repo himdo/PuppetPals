@@ -10,6 +10,9 @@ import Camera from './three/camera.js';
 import Lighting from './three/lighting.js';
 import Stage from './three/stage.js';
 import AssetBrowser from './assets/asset-browser.js';
+import PuppetEditor from './puppet/puppet-editor.js';
+import PuppetPanel from './ui/puppet-panel.js';
+import VisualEditor from './puppet/visual-editor.js';
 
 // DOM Elements
 let joinScreen, joinForm, nicknameInput, serverAddressInput, joinError, joinStatus, gameContainer;
@@ -18,6 +21,19 @@ let assetBrowser;
 
 // Movement bar elements (Request 19)
 let movementBar, moveLeftBtn, moveRightBtn, moveOnStageBtn, slotLabel, slotPosition;
+
+// Puppet Editor elements
+let puppetEditorOverlay, editorBoneList, editorProperties, editorChangesIndicator;
+let openEditorBtn, editorCloseBtn, editorResetBtn, editorSortYBtn, editorExportBtn, editorApplyBtn;
+let puppetBuilderBar;
+
+// Visual Editor elements
+let visualEditorOverlay, visualEditorContainer, veCloseBtn;
+
+// Puppet Editor instances
+let puppetEditor;
+let puppetPanel;
+let visualEditor;
 
 // Application state
 let appState;
@@ -50,6 +66,31 @@ function cacheElements() {
   moveOnStageBtn = document.getElementById('move-on-stage-btn');
   slotLabel = document.getElementById('slot-label');
   slotPosition = document.getElementById('slot-position');
+
+  // Puppet Builder bar
+  puppetBuilderBar = document.getElementById('puppet-builder-bar');
+  openEditorBtn = document.getElementById('open-editor-btn');
+
+  // Puppet Editor overlay elements
+  puppetEditorOverlay = document.getElementById('puppet-editor-overlay');
+  editorBoneList = document.getElementById('editor-bone-list');
+  editorProperties = document.getElementById('editor-properties');
+  editorChangesIndicator = document.getElementById('editor-changes-indicator');
+  openEditorBtn = document.getElementById('open-editor-btn');
+  editorCloseBtn = document.getElementById('editor-close-btn');
+  editorResetBtn = document.getElementById('editor-reset-btn');
+  editorSortYBtn = document.getElementById('editor-sort-y-btn');
+  editorExportBtn = document.getElementById('editor-export-btn');
+  editorApplyBtn = document.getElementById('editor-apply-btn');
+
+  // Visual Editor overlay elements
+  visualEditorOverlay = document.getElementById('visual-editor-overlay');
+  visualEditorContainer = document.getElementById('visual-editor-container');
+  veCloseBtn = document.getElementById('ve-close-btn');
+  const openVisualEditorBtn = document.getElementById('open-visual-editor-btn');
+  if (openVisualEditorBtn) {
+    openVisualEditorBtn.addEventListener('click', () => openVisualEditor());
+  }
 }
 
 /**
@@ -245,6 +286,540 @@ function updatePlayerInfo() {
   }
 }
 
+// ============================================================
+// Puppet Editor (Request 7 - In-Browser Puppet Builder)
+// ============================================================
+
+/**
+ * Initialize the Puppet Editor and Puppet Panel
+ */
+function initPuppetEditor() {
+  const rawSocket = socketClient ? socketClient.getSocket() : null;
+  if (!rawSocket) {
+    console.warn('[Main] No socket available for PuppetEditor');
+    return;
+  }
+
+  // Create the editor instance
+  puppetEditor = new PuppetEditor({ socket: rawSocket });
+
+  // Create the panel instance
+  puppetPanel = new PuppetPanel(rawSocket);
+  puppetPanel.setEditorCallback(() => openPuppetEditor());
+
+  // Show the builder bar
+  if (puppetBuilderBar) {
+    puppetBuilderBar.classList.remove('hidden');
+  }
+
+  // Wire up editor UI buttons
+  setupEditorUI();
+
+  // Setup socket listeners for puppet sync
+  setupPuppetEditorSocketListeners();
+
+  // Initialize the visual editor
+  initVisualEditor();
+
+  console.log('[Main] Puppet Editor initialized');
+}
+
+// ============================================================
+// Visual Editor (Drag-and-Drop Puppet Builder)
+// ============================================================
+
+/**
+ * Initialize the Visual Editor
+ */
+function initVisualEditor() {
+  if (!visualEditorContainer) {
+    console.warn('[Main] Visual editor container not found');
+    return;
+  }
+
+  const rawSocket = socketClient ? socketClient.getSocket() : null;
+
+  visualEditor = new VisualEditor({
+    container: visualEditorContainer,
+    socket: rawSocket,
+    assetBrowser: assetBrowser,
+  });
+
+  // Close button
+  if (veCloseBtn) {
+    veCloseBtn.addEventListener('click', () => closeVisualEditor());
+  }
+
+  // Click outside container to close
+  if (visualEditorOverlay) {
+    visualEditorOverlay.addEventListener('click', (e) => {
+      if (e.target === visualEditorOverlay) {
+        closeVisualEditor();
+      }
+    });
+  }
+
+  console.log('[Main] Visual Editor initialized');
+}
+
+/**
+ * Open the visual editor overlay
+ */
+function openVisualEditor() {
+  if (!visualEditorOverlay) return;
+
+  visualEditorOverlay.classList.add('active');
+
+  // Refresh palette and render canvas after overlay is visible
+  if (visualEditor) {
+    visualEditor.refreshPalette();
+    // Small delay to ensure DOM is visible before rendering
+    requestAnimationFrame(() => {
+      visualEditor.render();
+    });
+  }
+}
+
+/**
+ * Close the visual editor overlay
+ */
+function closeVisualEditor() {
+  if (!visualEditorOverlay) return;
+
+  visualEditorOverlay.classList.remove('active');
+}
+
+/**
+ * Wire up all editor UI button handlers
+ */
+function setupEditorUI() {
+  // Open editor button (from builder bar)
+  if (openEditorBtn) {
+    openEditorBtn.addEventListener('click', () => openPuppetEditor());
+  }
+
+  // Close button
+  if (editorCloseBtn) {
+    editorCloseBtn.addEventListener('click', () => closePuppetEditor());
+  }
+
+  // Reset button
+  if (editorResetBtn) {
+    editorResetBtn.addEventListener('click', () => {
+      if (puppetEditor) {
+        puppetEditor.resetToOriginal();
+        renderEditorProperties();
+        updateChangesIndicator();
+      }
+    });
+  }
+
+  // Sort Z by Y button
+  if (editorSortYBtn) {
+    editorSortYBtn.addEventListener('click', () => {
+      if (puppetEditor) {
+        puppetEditor.sortByYPosition();
+        renderEditorBoneList();
+        renderEditorProperties();
+      }
+    });
+  }
+
+  // Export JSON button
+  if (editorExportBtn) {
+    editorExportBtn.addEventListener('click', () => {
+      if (puppetEditor) {
+        const json = puppetEditor.exportJSON();
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'puppet-config.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+  }
+
+  // Apply button
+  if (editorApplyBtn) {
+    editorApplyBtn.addEventListener('click', () => {
+      if (puppetEditor) {
+        puppetEditor.applyChanges();
+        updateChangesIndicator();
+      }
+    });
+  }
+
+  // Click outside container to close
+  if (puppetEditorOverlay) {
+    puppetEditorOverlay.addEventListener('click', (e) => {
+      if (e.target === puppetEditorOverlay) {
+        closePuppetEditor();
+      }
+    });
+  }
+}
+
+/**
+ * Setup socket listeners for puppet editor sync
+ */
+function setupPuppetEditorSocketListeners() {
+  const rawSocket = socketClient ? socketClient.getSocket() : null;
+  if (!rawSocket) return;
+
+  // Listen for synced puppet updates from server
+  rawSocket.on('sync-puppet', (data) => {
+    console.log('[PuppetEditor] Received puppet sync:', data);
+    // If editor is open and editing this puppet, refresh
+    if (puppetEditor && puppetEditor.isActive) {
+      renderEditorBoneList();
+      renderEditorProperties();
+    }
+  });
+}
+
+/**
+ * Open the puppet editor overlay
+ */
+async function openPuppetEditor() {
+  if (!puppetEditor) return;
+
+  // Get the current puppet from appState
+  let puppet = getCurrentPuppet();
+  if (!puppet) {
+    // Try to dynamically import the Puppet class so we can create a default puppet
+    try {
+      const mod = await import('./puppet/puppet.js');
+      window._PuppetClass = mod.default;
+      puppet = getCurrentPuppet();
+    } catch (e) {
+      console.warn('[PuppetEditor] Failed to load Puppet class for default editor puppet', e);
+    }
+  }
+
+  if (!puppet) {
+    console.warn('[PuppetEditor] No puppet found to edit');
+    return;
+  }
+
+  // Activate editing on the current puppet
+  puppetEditor.activate(puppet);
+
+  // Render the bone list and properties
+  renderEditorBoneList();
+  renderEditorProperties();
+  updateChangesIndicator();
+
+  // Show the overlay
+  if (puppetEditorOverlay) {
+    puppetEditorOverlay.classList.add('active');
+  }
+}
+
+/**
+ * Close the puppet editor overlay
+ */
+function closePuppetEditor() {
+  if (!puppetEditor) return;
+
+  puppetEditor.deactivate();
+
+  if (puppetEditorOverlay) {
+    puppetEditorOverlay.classList.remove('active');
+  }
+}
+
+/**
+ * Get the current puppet from the Three.js scene, or create a default puppet for editing.
+ * @returns {Object|null} Puppet instance with skeleton and group
+ */
+function getCurrentPuppet() {
+  // Try to find existing puppet in the scene
+  if (threeScene) {
+    const scene = threeScene.getScene();
+    const puppetObj = scene.getObjectByName(`puppet-${appState?.localPlayerId}`);
+    if (puppetObj && puppetObj.userData?.skeleton) {
+      // Puppet exists in scene with skeleton
+      return {
+        skeleton: puppetObj.userData.skeleton,
+        group: puppetObj,
+      };
+    }
+  }
+
+  // Create a default puppet for editing (not yet on stage)
+  return createDefaultPuppetForEdit();
+}
+
+/**
+ * Create a default puppet instance for editing in the builder.
+ * This puppet is not yet on stage - it exists only in the editor.
+ * @returns {Object} Puppet-like object with skeleton and group
+ */
+function createDefaultPuppetForEdit() {
+  const PuppetClass = window._PuppetClass;
+  if (PuppetClass) {
+    const puppet = new PuppetClass({
+      id: `puppet-${appState?.localPlayerId || 'edit'}`,
+      ownerId: appState?.localPlayerId || 'edit',
+      name: window.nickname || 'Editor',
+    });
+
+    // Load default skeleton config
+    const defaultConfig = {
+      name: 'My Puppet',
+      bones: [
+        { id: 'torso', name: 'Torso', parentId: null, asset: 'torso.png', position: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1 }, socketOffset: { x: 0, y: 0.5 }, zDepth: 1 },
+        { id: 'head', name: 'Head', parentId: 'torso', asset: 'head.png', position: { x: 0, y: 1.2, z: 0 }, scale: { x: 0.8, y: 0.8 }, socketOffset: { x: 0, y: 0.8 }, zDepth: 3 },
+        { id: 'upper-arm-l', name: 'Upper Arm Left', parentId: 'torso', asset: 'upper-arm-l.png', position: { x: -0.8, y: 0.5, z: 0 }, scale: { x: 0.5, y: 0.8 }, socketOffset: { x: 0, y: -0.6 }, zDepth: 2 },
+        { id: 'upper-arm-r', name: 'Upper Arm Right', parentId: 'torso', asset: 'upper-arm-r.png', position: { x: 0.8, y: 0.5, z: 0 }, scale: { x: 0.5, y: 0.8 }, socketOffset: { x: 0, y: -0.6 }, zDepth: 2 },
+        { id: 'upper-leg-l', name: 'Upper Leg Left', parentId: 'torso', asset: 'upper-leg-l.png', position: { x: -0.4, y: -0.8, z: 0 }, scale: { x: 0.5, y: 0.8 }, socketOffset: { x: 0, y: -0.7 }, zDepth: 0 },
+        { id: 'upper-leg-r', name: 'Upper Leg Right', parentId: 'torso', asset: 'upper-leg-r.png', position: { x: 0.4, y: -0.8, z: 0 }, scale: { x: 0.5, y: 0.8 }, socketOffset: { x: 0, y: -0.7 }, zDepth: 0 },
+      ],
+    };
+
+    puppet.load(defaultConfig, '/assets');
+    return puppet;
+  }
+
+  return null;
+}
+
+/**
+ * Render the bone list in the editor
+ */
+function renderEditorBoneList() {
+  if (!puppetEditor || !editorBoneList) return;
+
+  const bones = puppetEditor.getBoneList();
+  editorBoneList.innerHTML = '';
+
+  if (!bones || bones.length === 0) {
+    editorBoneList.innerHTML = '<div class="puppet-editor-no-selection">No bones found</div>';
+    return;
+  }
+
+  for (const boneInfo of bones) {
+    const item = document.createElement('div');
+    item.className = `bone-list-item ${puppetEditor.selectedBoneId === boneInfo.id ? 'selected' : ''}`;
+    item.dataset.boneId = boneInfo.id;
+
+    // Indent based on parent
+    const indent = boneInfo.parentId ? '<span class="bone-indent"></span>' : '';
+
+    item.innerHTML = `
+      ${indent}
+      <span class="bone-icon">◉</span>
+      <span class="bone-name">${boneInfo.name || boneInfo.id}</span>
+      <span class="bone-asset">[Z:${boneInfo.zDepth || 0}]</span>
+    `;
+
+    item.addEventListener('click', () => {
+      puppetEditor.selectBone(boneInfo.id);
+      renderEditorBoneList();
+      renderEditorProperties();
+    });
+
+    editorBoneList.appendChild(item);
+  }
+}
+
+/**
+ * Render the properties panel for the selected bone
+ */
+function renderEditorProperties() {
+  if (!puppetEditor || !editorProperties) return;
+
+  const boneId = puppetEditor.selectedBoneId;
+  if (!boneId) {
+    editorProperties.innerHTML = '<div class="puppet-editor-no-selection">Select a bone to edit its properties</div>';
+    return;
+  }
+
+  // Get all properties for the selected bone
+  const position = puppetEditor.getBonePosition(boneId);
+  const rotation = puppetEditor.getBoneRotation(boneId);
+  const scale = puppetEditor.getBoneScale(boneId);
+  const socketOffset = puppetEditor.getSocketOffset(boneId);
+  const zDepth = puppetEditor.getBoneZDepth(boneId);
+  const asset = puppetEditor.getBoneAsset(boneId);
+
+  editorProperties.innerHTML = `
+    <h3>Bone Properties</h3>
+
+    <div class="property-section">
+      <div class="property-section-title">Position</div>
+      ${propertySlider('X', position?.x ?? 0, -10, 10, 0.1, 'posX')}
+      ${propertySlider('Y', position?.y ?? 0, -10, 10, 0.1, 'posY')}
+      ${propertySlider('Z', position?.z ?? 0, -10, 10, 0.1, 'posZ')}
+    </div>
+
+    <div class="property-section">
+      <div class="property-section-title">Rotation (degrees)</div>
+      ${propertySlider('X', rotation?.x ?? 0, -180, 180, 1, 'rotX')}
+      ${propertySlider('Y', rotation?.y ?? 0, -180, 180, 1, 'rotY')}
+      ${propertySlider('Z', rotation?.z ?? 0, -180, 180, 1, 'rotZ')}
+    </div>
+
+    <div class="property-section">
+      <div class="property-section-title">Scale</div>
+      ${propertySlider('X', scale?.x ?? 1, 0.1, 5, 0.1, 'scaleX')}
+      ${propertySlider('Y', scale?.y ?? 1, 0.1, 5, 0.1, 'scaleY')}
+    </div>
+
+    <div class="property-section">
+      <div class="property-section-title">Socket Offset</div>
+      ${propertySlider('X', socketOffset?.x ?? 0, -5, 5, 0.1, 'socketX')}
+      ${propertySlider('Y', socketOffset?.y ?? 0, -5, 5, 0.1, 'socketY')}
+    </div>
+
+    <div class="property-section">
+      <div class="property-section-title">Z-Depth (Layer)</div>
+      ${propertySlider('Z', zDepth ?? 0, -10, 10, 1, 'zDepth')}
+    </div>
+
+    <div class="property-section">
+      <div class="property-section-title">Asset</div>
+      <div class="property-row">
+        <span class="property-label">File</span>
+        <input type="text" class="property-input" id="prop-asset" value="${asset || ''}" placeholder="bone-image.png" />
+        <button type="button" class="btn btn-small" id="prop-asset-browse" title="Browse assets">Browse</button>
+      </div>
+      <div id="prop-asset-picker" class="asset-picker hidden"></div>
+    </div>
+  `;
+
+  // Bind slider events
+  bindPropertySliders(boneId);
+}
+
+/**
+ * Generate HTML for a property slider row
+ */
+function propertySlider(label, value, min, max, step, id) {
+  return `
+    <div class="property-row">
+      <span class="property-label">${label}</span>
+      <input type="range" class="property-slider" id="prop-${id}" min="${min}" max="${max}" step="${step}" value="${value}" />
+      <span class="property-value" id="prop-${id}-value">${value}</span>
+    </div>
+  `;
+}
+
+/**
+ * Bind slider change events to update the bone
+ * @param {string} boneId
+ */
+function bindPropertySliders(boneId) {
+  const sliders = editorProperties.querySelectorAll('.property-slider');
+  sliders.forEach(slider => {
+    slider.addEventListener('input', (e) => {
+      const id = e.target.id.replace('prop-', '');
+      const value = parseFloat(e.target.value);
+      const valueEl = document.getElementById(`prop-${id}-value`);
+      if (valueEl) valueEl.textContent = value;
+
+      // Apply to bone based on property type
+      applyPropertyChange(boneId, id, value);
+      updateChangesIndicator();
+    });
+  });
+
+  // Asset input
+  const assetInput = document.getElementById('prop-asset');
+  if (assetInput) {
+    assetInput.addEventListener('change', (e) => {
+      puppetEditor.setBoneAsset(boneId, e.target.value);
+      updateChangesIndicator();
+    });
+  }
+
+  // Asset browse button
+  const browseBtn = document.getElementById('prop-asset-browse');
+  if (browseBtn) {
+    browseBtn.addEventListener('click', () => showAssetPicker(boneId));
+  }
+}
+
+/**
+ * Show a dropdown picker of available puppet assets for the bone
+ * @param {string} boneId
+ */
+function showAssetPicker(boneId) {
+  const picker = document.getElementById('prop-asset-picker');
+  if (!picker) return;
+
+  // Get available puppet assets from the asset browser
+  const assets = assetBrowser ? assetBrowser.getAssetsByCategory('puppets') : [];
+
+  if (assets.length === 0) {
+    picker.innerHTML = '<div class="asset-picker-empty">No puppet assets available. Upload assets first.</div>';
+    picker.classList.remove('hidden');
+    return;
+  }
+
+  // Filter to image files only
+  const imageAssets = assets.filter(a => a.fileType === 'image');
+
+  picker.innerHTML = '';
+  imageAssets.forEach(asset => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'asset-picker-item';
+    btn.textContent = asset.name || asset.path;
+    btn.title = asset.path;
+    btn.addEventListener('click', () => {
+      puppetEditor.setBoneAsset(boneId, asset.name || asset.path);
+      const assetInput = document.getElementById('prop-asset');
+      if (assetInput) assetInput.value = asset.name || asset.path;
+      picker.classList.add('hidden');
+      updateChangesIndicator();
+    });
+    picker.appendChild(btn);
+  });
+
+  picker.classList.remove('hidden');
+}
+
+/**
+ * Apply a property change to the bone
+ * @param {string} boneId
+ * @param {string} propId
+ * @param {number} value
+ */
+function applyPropertyChange(boneId, propId, value) {
+  switch (propId) {
+    case 'posX': puppetEditor.setBonePositionX(boneId, value); break;
+    case 'posY': puppetEditor.setBonePositionY(boneId, value); break;
+    case 'posZ': puppetEditor.setBonePositionZ(boneId, value); break;
+    case 'rotX': puppetEditor.setBoneRotationX(boneId, value); break;
+    case 'rotY': puppetEditor.setBoneRotationY(boneId, value); break;
+    case 'rotZ': puppetEditor.setBoneRotationZ(boneId, value); break;
+    case 'scaleX': puppetEditor.setBoneScaleX(boneId, value); break;
+    case 'scaleY': puppetEditor.setBoneScaleY(boneId, value); break;
+    case 'socketX': puppetEditor.setSocketOffsetX(boneId, value); break;
+    case 'socketY': puppetEditor.setSocketOffsetY(boneId, value); break;
+    case 'zDepth': puppetEditor.setBoneZDepth(boneId, value); break;
+  }
+}
+
+/**
+ * Update the changes indicator (saved/unsaved dot)
+ */
+function updateChangesIndicator() {
+  if (!editorChangesIndicator || !puppetEditor) return;
+
+  const hasChanges = puppetEditor.hasChanges();
+  if (hasChanges) {
+    editorChangesIndicator.className = 'changes-indicator';
+    editorChangesIndicator.innerHTML = '<span class="dot"></span> Modified';
+  } else {
+    editorChangesIndicator.className = 'changes-indicator saved';
+    editorChangesIndicator.innerHTML = '<span class="dot"></span> Saved';
+  }
+}
+
 /**
  * Hide the join screen and show the game
  */
@@ -269,6 +844,9 @@ function enterGame() {
   // Initialize movement bar (Request 19)
   initMovementBar();
   startMovementButtonSync();
+
+  // Initialize puppet editor (always available to all players)
+  initPuppetEditor();
 }
 
 /**

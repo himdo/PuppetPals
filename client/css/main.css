@@ -243,6 +243,11 @@ html, body {
   z-index: 100;
 }
 
+/* Space for editor button next to assets */
+#open-editor-btn {
+  margin-left: 8px;
+}
+
 .player-info {
   font-size: 0.85rem;
   color: #ccc;
@@ -398,6 +403,22 @@ html, body {
 
 .asset-item:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* Puppet Builder Bar - fixed so it stays visible above the stage */
+#puppet-builder-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 110;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#puppet-builder-bar .btn {
+  pointer-events: auto;
 }
 
 .asset-thumbnail {
